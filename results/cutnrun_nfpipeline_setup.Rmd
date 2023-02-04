@@ -1,0 +1,152 @@
+---
+title: "Use nf-core/cutnrun pipeline"
+output: html_document
+date: '2022-12-06'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+# Install nextflow
+
+
+Instructions to install nextflow: https://www.nextflow.io/docs/latest/getstarted.html#installation
+
+Go to your bin directory or the directory where you want your installation and install nextflow
+
+```{bash eval = FALSE}
+srun -c 2 --mem 8 -p common --pty bash # open interactive session 
+
+cd ~/jes157/bin
+
+wget -qO- https://get.nextflow.io | bash 
+```
+
+Note: nextflow requires java 11 so before using nextflow make sure to load the module:
+
+```{bash eval = FALSE}
+module load Java/11.0.8
+```
+
+Test nextflow works
+```{bash eval = FALSE}
+nextflow run hello
+
+```
+
+Output should look something like:
+N E X T F L O W  ~  version 22.10.3
+Pulling nextflow-io/hello ...
+ downloaded from https://github.com/nextflow-io/hello.git
+Launching `https://github.com/nextflow-io/hello` [special_bohr] DSL2 - revision: 4eab81bd42 [master]
+executor >  local (4)
+[f9/37d0f2] process > sayHello (3) [100%] 4 of 4 ✔
+Bonjour world!
+
+Ciao world!
+
+Hola world!
+
+Hello world!
+
+Change singularity cache to a directory within your group folder
+```{bash eval = FALSE}
+echo 'export NXF_SINGULARITY_CACHEDIR=/hpc/groups/jes157/singularity_cache' >> ~/.bashrc
+```
+
+# Download nf-core/cutandrun pipeline
+
+Info on how to use the pipeline: https://nf-co.re/cutandrun/usage
+
+Go to your execution directory
+```{bash eval = FALSE}
+cd /work/jes157/cutnrun_socialexperience
+```
+
+
+Test running nf-core/cutandrun
+
+```{bash eval = FALSE}
+nextflow run nf-core/cutandrun -profile test,singularity --outdir /work/jes157/cutnrun_socialexperience/cutnrun_test
+
+```
+
+---
+The last few lines of the console text output should look something like this:
+
+-[nf-core/cutandrun] Pipeline completed successfully-
+Completed at: 06-Dec-2022 16:48:27
+Duration    : 15m 7s
+CPU hours   : 0.2
+Succeeded   : 120
+---
+
+Make config file to specify max memory and cpus 
+
+```{bash eval = FALSE}
+params {
+    max_memory                 = "16.GB"
+    max_cpus                   = 4
+}
+```
+
+Save as config.txt
+
+Prepare genome files (only if using custom genome files)
+
+```{bash eval = FALSE}
+ wget http://ftp.flybase.net/genomes/Drosophila_melanogaster/dmel_r6.45_FB2022_02/fasta/dmel-all-chromosome-r6.45.fasta.gz
+wget http://ftp.flybase.net/genomes/Drosophila_melanogaster/dmel_r6.45_FB2022_02/gtf/dmel-all-r6.45.gtf.gz
+
+wget https://github.com/Boyle-Lab/Blacklist/raw/master/lists/dm6-blacklist.v2.bed.gz
+```
+
+Make bowtie2 index
+```{bash eval = FALSE}
+#!/bin/sh
+#SBATCH -J bowtie2idx
+#SBATCH -c 4
+#SBATCH --mem=16G
+
+module load Bowtie2/2.4.4-rhel8
+
+bowtie2-build --threads 4 dmel-all-chromosome-r6.45.fasta.gz dm6
+
+```
+
+
+
+
+```{bash eval = FALSE}
+srun -c 8 --mem 16G -p common --pty bash # open interactive session 
+module load Java/11.0.8
+
+nextflow run nf-core/cutandrun --input sample_sheet_test.csv --outdir /work/jes157/cutnrun_socialexperience/cutnrun_test_full --genome dm6 -profile singularity --use_control false -resume -c config.txt
+
+```
+
+If using custom genome files add these instead of genome:
+```{bash eval = FALSE}
+--bowtie2 /path/to/bowtie2.idx --gtf /work/jes157/cutnrun_socialexperience/genome_files/dmel-all-r6.45.gtf --fasta /work/jes157/cutnrun_socialexperience/genome_files/dmel-all-chromosome-r6.45.fasta --blacklist dm6-blacklist.v2.bed.gz
+
+```
+
+
+
+```{bash eval = FALSE}
+#!/bin/sh
+#SBATCH -J CutAndRun
+#SBATCH -c 1
+#SBATCH --mem=16G
+module load Java/11.0.8
+
+nextflow run nf-core/cutandrun --input cutnrun_nextflow_data_sheet_dec22.csv --outdir /work/jes157/cutnrun_socialexperience/cutandrun_nfrun_dec22 --bowtie2 /work/jes157/cutnrun_socialexperience/genome_files/dm6 --gtf /work/jes157/cutnrun_socialexperience/genome_files/dmel-all-r6.45.gtf --fasta /work/jes157/cutnrun_socialexperience/genome_files/dmel-all-chromosome-r6.45.fasta --blacklist /work/jes157/cutnrun_socialexperience/genome_files/dm6-blacklist.v2.bed -profile singularity --normalisation_binsize 1 --use_control false --peakcaller seacr,macs2 --macs2_narrow_peak false -c config.txt
+
+```
+
+
+
+
