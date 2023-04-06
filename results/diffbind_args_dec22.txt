@@ -1,0 +1,13 @@
+# Diff count
+cutnrun_peaks_dir <- "/work/jes157/cutnrun_socialexperience/differential_analysis/peaks_dir/RNAPolII/"
+blacklist_bed <- "/work/jes157/cutnrun_socialexperience/genome_files/dm6-blacklist.v2.bed"
+bam_dir <- "/work/jes157/cutnrun_socialexperience/differential_analysis/bams_dir/RNAPolII"
+bam_files <- list.files(bam_dir,pattern = ".bam$",full.names = T)
+output_consensus <- "./data_output/cutnrun_RNAPolII_macs2_peaks_union.bed"
+output_deseq <- "./data_output/cutnrun_RNAPolII_macs2_peaks_union_deseq_counts.Rds"
+
+
+# test
+res_names <- c("results_cutnrun_IgG_macs2_peaks_union_deseq")
+out_dir <- "data_output/diffbind_cutnrun/"
+deseq_obj_file <- "/Volumes/ExtremePro/Emi/social_experience/cutandrun_dec22/differential_analysis/data_output/cutnrun_IgG_macs2_peaks_union_deseq_counts.Rds"
