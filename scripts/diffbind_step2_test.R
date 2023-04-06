@@ -1,11 +1,14 @@
 library(DESeq2)
 library(tidyverse)
 # Inputs
-contrasts_list <- list(c("housing","SH","GH"))
+inputs <- commandArgs(trailingOnly = TRUE)
 
-res_names <- c("results_cutnrun_IgG_macs2_peaks_union_deseq")
-out_dir <- "data_output/diffbind_cutnrun/"
-deseq_obj_file <- "/Volumes/ExtremePro/Emi/social_experience/cutandrun_dec22/differential_analysis/data_output/cutnrun_IgG_macs2_peaks_union_deseq_counts.Rds"
+
+contrasts_list <- list(c(inputs[1],inputs[2],inputs[3]))
+
+res_names <- inputs[4]
+out_dir <- inputs[5]
+deseq_obj_file <- inputs[6]
 
 # Load deseq obj
 deseq_obj <- readRDS(deseq_obj_file)
