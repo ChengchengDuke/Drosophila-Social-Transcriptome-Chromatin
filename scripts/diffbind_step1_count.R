@@ -4,13 +4,14 @@ library(tidyverse)
 library(csaw)
 library(DESeq2)
 
+inputs <- commandArgs(trailingOnly = TRUE)
 # Inputs
-cutnrun_peaks_dir <- "/work/jes157/cutnrun_socialexperience/differential_analysis/peaks_dir/RNAPolII/"
-blacklist_bed <- "/work/jes157/cutnrun_socialexperience/genome_files/dm6-blacklist.v2.bed"
-bam_dir <- "/work/jes157/cutnrun_socialexperience/differential_analysis/bams_dir/RNAPolII"
+cutnrun_peaks_dir <- inputs[1]
+blacklist_bed <- inputs[2]
+bam_dir <- inputs[3]
 bam_files <- list.files(bam_dir,pattern = ".bam$",full.names = T)
-output_consensus <- "./data_output/cutnrun_RNAPolII_macs2_peaks_union.bed"
-output_deseq <- "./data_output/cutnrun_RNAPolII_macs2_peaks_union_deseq_counts.Rds"
+output_consensus <- inputs[4]
+output_deseq <- inputs[5]
 
 cutnrun_peaks_files <- list.files(cutnrun_peaks_dir,pattern = ".bed")
 cutnrun_peaks_full <- paste0(cutnrun_peaks_dir,cutnrun_peaks_files)
