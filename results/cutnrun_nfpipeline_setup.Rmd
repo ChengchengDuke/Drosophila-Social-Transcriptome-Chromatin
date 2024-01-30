@@ -150,3 +150,55 @@ nextflow run nf-core/cutandrun --input cutnrun_nextflow_data_sheet_dec22.csv --o
 
 
 
+```{bash}
+#!/bin/sh
+#SBATCH -J CutAndRun
+#SBATCH -c 1
+#SBATCH --mem=64G
+module load Java/11.0.8
+
+nextflow run nf-core/cutandrun --input cutnrun_nextflow_data_sheet_test_sep23.csv --outdir /work/jes157/cutnrun_nfrun/202309_cutnrun_nfrun_test_run --bowtie2 /work/jes157/cutnrun_nfrun/genome_files/dm6 --gtf /work/jes157/cutnrun_nfrun/genome_files/dmel-all-r6.45.gtf --fasta /work/jes157/cutnrun_nfrun/genome_files/dmel-all-chromosome-r6.45.fasta --blacklist /work/jes157/cutnrun_nfrun/genome_files/dm6-blacklist.v2.bed -profile singularity --normalisation_binsize 1 --use_control false --peakcaller seacr,macs2 --macs2_narrow_peak false -c config.txt -resume
+
+```
+
+
+```{bash}
+#!/bin/sh
+#SBATCH -J nfcore-rnaseq
+#SBATCH -c 8
+#SBATCH --mem=64G
+module load Java/11.0.8
+
+nextflow run nf-core/cutandrun --input nfcore_rnaseq_sample_info_test_run_sep23.csv --outdir /work/jes157/rnaseq_nfrun/202309_rnaseq_nfrun_test_run --genome dm6 --skip_trimming  -profile singularity -c config.txt -resume
+
+```
+
+```{bash}
+#!/bin/sh
+#SBATCH -J nfcore-rnaseq
+#SBATCH -c 8
+#SBATCH --mem=64G
+module load Java/11.0.8
+
+nextflow run nf-core/rnaseq -profile test,singularity --outdir /work/jes157/cutnrun_socialexperience/rnaseq_test 
+
+```
+
+```{bash}
+#!/bin/sh
+#SBATCH -J nfcore-rnaseq
+#SBATCH -c 8
+#SBATCH --mem=64G
+#SBATCH -a 1-1
+
+module load Java/11.0.8
+
+names_file=cutnrun_nextflow_data_sheet_test_sep23.csv
+current_file_name=cutnrun_nextflow_data_sheet_test_sep23_${SLURM_ARRAY_TASK_ID}.csv
+
+head -1 $names_file > $current_file_name
+awk -v i=$SLURM_ARRAY_TASK_ID 'BEGIN{i+=1}NR==i' $names_file >> $current_file_name
+
+nextflow run nf-core/cutandrun --input $current_file_name --outdir /work/jes157/cutnrun_nfrun/202309_cutnrun_nfrun_test2_${SLURM_ARRAY_TASK_ID} --genome BDGP6 -profile singularity --normalisation_binsize 1 --use_control false --peakcaller seacr,macs2 --macs2_narrow_peak false -c config.txt -resume --multiqc_title ${current_file_name}_multiqc
+
+```
