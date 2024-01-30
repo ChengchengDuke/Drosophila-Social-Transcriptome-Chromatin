@@ -1,3 +1,4 @@
 # Ignore everything in data directories except the README
 data_*/*
 !data_*/*md
+.Rproj.user
