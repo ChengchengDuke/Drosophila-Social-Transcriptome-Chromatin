@@ -1,6 +1,5 @@
 library(DESeq2)
 library(tidyverse)
-
 # Inputs
 inputs <- commandArgs(trailingOnly = TRUE)
 
