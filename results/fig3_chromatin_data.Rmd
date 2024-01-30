@@ -1,0 +1,110 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Overview
+
+## Figure 2 Chromatin changes in the central brain between social conditions, and olfactory receptor mutants and transcription factors mutants
+
+# Libraries
+```{r}
+library(tidyverse)
+library(ComplexHeatmap)
+```
+
+# Functions
+```{r}
+
+
+```
+
+# Read data
+
+```{r}
+data_dir <- "../data_output/2024-01_diffbind_cutnrun/"
+```
+
+DESeq files
+```{r}
+deseq_files <- list.files(data_dir,pattern = "[^$]+_deseq_obj_fitted.Rds")
+deseq_list <- lapply(paste0(data_dir,deseq_files), readRDS)
+names(deseq_list) <- deseq_files
+```
+
+
+Results joined files
+
+```{r}
+res_df_h3k4me3 <- read_tsv(file = "../data_output/2024-01_diffbind_cutnrun/res_df_h3k4me3_all_join.tsv")
+res_df_h3k27ac <- read_tsv(file = "../data_output/2024-01_diffbind_cutnrun/res_df_h3k27ac_all_join.tsv")
+res_df_rnapolii <- read_tsv(file = "../data_output/2024-01_diffbind_cutnrun/res_df_rnapolii_all_join.tsv")
+
+```
+
+
+# Data re-shaping
+
+Filter by chromatin mark 
+```{r}
+deseq_list_h3k4me3 <- str_detect(names(deseq_list),"H3K4me3")
+deseq_list_h3k27ac <- str_detect(names(deseq_list),"H3K27ac")
+deseq_list_rnapolii <- str_detect(names(deseq_list),"RNAPolII")
+
+```
+
+Clean list names
+```{r}
+names(deseq_list) <- str_remove(names(deseq_list),"cutnrun_")
+```
+
+
+
+# D Heatmap showing pairwise LFC for LRT test
+
+```{r}
+padj_mat_h3kme3 <- res_df_h3k4me3 %>%
+  select(starts_with("padj"))
+  
+colnames(padj_mat_h3kme3) <- str_remove(colnames(padj_mat_h3kme3), "padj")
+
+ComplexHeatmap::Heatmap(t(padj_mat_h3kme3),cluster_rows = FALSE)
+```
+
+```{r}
+pairwise_log2f_mat_h3kme3 <- res_df_h3k4me3 %>%
+  filter(padjH3K4me3_genotype_lrt < 0.000000000001) %>%
+  select(starts_with("log2Fold")) %>%
+  select(!contains("lrt")) %>%
+  select(contains("genotype"))
+
+colnames(pairwise_log2f_mat_h3kme3) <- str_remove(colnames(pairwise_log2f_mat_h3kme3), "log2FoldChange")
+colnames(pairwise_log2f_mat_h3kme3) <- str_remove(colnames(pairwise_log2f_mat_h3kme3), "_genotype")
+colnames(pairwise_log2f_mat_h3kme3) <- str_remove(colnames(pairwise_log2f_mat_h3kme3), "_ashr")
+
+
+ComplexHeatmap::Heatmap(t(pairwise_log2f_mat_h3kme3),cluster_rows = FALSE)
+```
+
+
+
+# E Volcano plot for specific comparisons
+
+```{r}
+
+```
+
+
+# G Venn diagrams for overlap of results for specific conditions
+
+
+
+
+# Plots not made in R
+## A Overview
+## E Pileup of signal for specific clusters
+## F IGV examples for specific clusters
+## B Positive / Negative control genes IGV screenshot
+
+
+
