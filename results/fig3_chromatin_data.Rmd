@@ -11,6 +11,7 @@ output: html_notebook
 ```{r}
 library(tidyverse)
 library(ComplexHeatmap)
+library(DESeq2)
 ```
 
 # Functions
@@ -59,46 +60,493 @@ names(deseq_list) <- str_remove(names(deseq_list),"cutnrun_")
 ```
 
 
-
 # D Heatmap showing pairwise LFC for LRT test
 
-```{r}
-padj_mat_h3kme3 <- res_df_h3k4me3 %>%
-  select(starts_with("padj"))
-  
-colnames(padj_mat_h3kme3) <- str_remove(colnames(padj_mat_h3kme3), "padj")
+Split  based on log2fc sign combinations
 
-ComplexHeatmap::Heatmap(t(padj_mat_h3kme3),cluster_rows = FALSE)
+```{r}
+
+res_df_h3k4me3 <- res_df_h3k4me3 %>%
+  mutate(across(starts_with("log2FoldChange"),sign,.names = "sign_{.col}"))
+
+res_df_h3k4me3 <- res_df_h3k4me3 %>%
+  mutate(sign_paste_genotype_gh = paste0(
+    "dsx-gh:",sign_log2FoldChange_H3K4me3_dsxmut_GH_genotype_ashr,
+    "_fru-gh:",sign_log2FoldChange_H3K4me3_frumut_GH_genotype_ashr,
+    "_Or47b-gh:",sign_log2FoldChange_H3K4me3_Or47bmut_GH_genotype_ashr,
+    "_Or67d-gh:",sign_log2FoldChange_H3K4me3_Or67dmut_GH_genotype_ashr),
+    sign_paste_genotype_sh = paste0(
+      "dsx-sh:",sign_log2FoldChange_H3K4me3_dsxmut_SH_genotype_ashr,
+      "_fru-sh:",sign_log2FoldChange_H3K4me3_frumut_SH_genotype_ashr,
+      "_Or47b-sh:",sign_log2FoldChange_H3K4me3_Or47bmut_SH_genotype_ashr,
+      "_Or67d-sh:",sign_log2FoldChange_H3K4me3_Or67dmut_SH_genotype_ashr),
+    sign_paste_genotype = paste0(
+      "dsx-gh:",sign_log2FoldChange_H3K4me3_dsxmut_GH_genotype_ashr,
+      "dsx-sh:",sign_log2FoldChange_H3K4me3_dsxmut_SH_genotype_ashr,
+      "_fru-gh:",sign_log2FoldChange_H3K4me3_frumut_GH_genotype_ashr,
+      "_fru-sh:",sign_log2FoldChange_H3K4me3_frumut_SH_genotype_ashr,
+      "_Or47b-gh:",sign_log2FoldChange_H3K4me3_Or47bmut_GH_genotype_ashr,
+      "_Or47b-sh:",sign_log2FoldChange_H3K4me3_Or47bmut_SH_genotype_ashr,
+      "_Or67d-gh:",sign_log2FoldChange_H3K4me3_Or67dmut_GH_genotype_ashr,
+      "_Or67d-sh:",sign_log2FoldChange_H3K4me3_Or67dmut_SH_genotype_ashr))
+
 ```
 
+
+
 ```{r}
-pairwise_log2f_mat_h3kme3 <- res_df_h3k4me3 %>%
-  filter(padjH3K4me3_genotype_lrt < 0.000000000001) %>%
-  select(starts_with("log2Fold")) %>%
+# Filter results dataframe to get significant lrt genotype regions
+# Select relevant columns for pairwise LogFC
+pairwise_log2fc_h3kme3_df <- res_df_h3k4me3 %>%
+  filter(padj_H3K4me3_genotype_lrt < 0.01) %>%
+  select(seqnames, start, end, sign_paste_genotype_gh,starts_with("log2FoldChange")) %>%
   select(!contains("lrt")) %>%
-  select(contains("genotype"))
+  select(!contains("housing")) %>%
+  select(!contains("_SH_"))
 
-colnames(pairwise_log2f_mat_h3kme3) <- str_remove(colnames(pairwise_log2f_mat_h3kme3), "log2FoldChange")
-colnames(pairwise_log2f_mat_h3kme3) <- str_remove(colnames(pairwise_log2f_mat_h3kme3), "_genotype")
-colnames(pairwise_log2f_mat_h3kme3) <- str_remove(colnames(pairwise_log2f_mat_h3kme3), "_ashr")
+# Filter by absolute Fold change
+# Create a matrix with only fold change 
+pairwise_log2fc_h3kme3_mat <- pairwise_log2fc_h3kme3_df %>%
+  select(starts_with("log2FoldChange"))
+# Make a logical filterl
+logfc_filter <- rowSums(abs(pairwise_log2fc_h3kme3_mat) > 1) >= 1
+
+# Filter out the dataframe
+pairwise_log2fc_h3kme3_df <- pairwise_log2fc_h3kme3_df %>%
+  filter(logfc_filter)
+
+# Change the column names for the data.frame to keeep only relevant info 
+colnames(pairwise_log2fc_h3kme3_df) <- str_remove(colnames(pairwise_log2fc_h3kme3_df), "log2FoldChange_")
+colnames(pairwise_log2fc_h3kme3_df) <- str_remove(colnames(pairwise_log2fc_h3kme3_df), "_genotype_ashr")
+colnames(pairwise_log2fc_h3kme3_df) <- str_remove(colnames(pairwise_log2fc_h3kme3_df), "_GH")
+colnames(pairwise_log2fc_h3kme3_df) <- str_remove(colnames(pairwise_log2fc_h3kme3_df), "H3K4me3_") 
+  colnames(pairwise_log2fc_h3kme3_df) <- str_remove(colnames(pairwise_log2fc_h3kme3_df), "mut") 
 
 
-ComplexHeatmap::Heatmap(t(pairwise_log2f_mat_h3kme3),cluster_rows = FALSE)
+colnames(pairwise_log2fc_h3kme3_df)
 ```
+
+
+```{r}
+pairwise_log2fc_h3kme3_df <- pairwise_log2fc_h3kme3_df %>%
+  pivot_longer(cols = - c(seqnames, start, end,sign_paste_genotype_gh), names_to = "genotype",values_to = "log2FoldChange") %>%
+  mutate(gene_name = paste0(seqnames,":",start,"-",end))
+
+
+```
+
+```{r}
+sort(table(pairwise_log2fc_h3kme3_df$sign_paste_genotype_gh)) %>%
+  enframe() %>%
+  mutate(name = as.factor(name)) %>%
+  mutate(name = fct_reorder(name, sort(value))) %>%
+  ggplot(aes(value, name)) +
+  geom_col() +
+  ylab(NULL) +
+  xlab("N regions") +
+  ggtitle("Number of differential H3K4me3 regions by sign combination")
+
+```
+
+
+```{r }
+
+
+pairwise_log2fc_h3kme3_df %>%
+  filter(seqnames %in% c("2L","2R","3L","3R","X")) %>%
+  mutate(log2FoldChange = case_when(
+    log2FoldChange > 1 ~ 1,
+    log2FoldChange < -1 ~ -1,
+    TRUE ~ log2FoldChange
+  )) %>%
+  ggplot(aes(genotype, gene_name, fill = log2FoldChange)) +
+  geom_tile() +  
+  scale_fill_gradient2(mid = "white",high = "red",low = "blue") +
+  theme_minimal() +
+  theme(aspect.ratio = 1,axis.text.y = element_blank()) +
+  facet_wrap(~sign_paste_genotype_gh , scales = "free") + 
+  ylab(NULL) +
+  xlab(NULL) +
+  ggtitle("H3K4me3")
+
+
+```
+
+
+RNAPolII
+
+Split  based on log2fc sign combinations
+
+```{r}
+
+res_df_rnapolii <- res_df_rnapolii %>%
+  mutate(across(starts_with("log2FoldChange"),sign,.names = "sign_{.col}"))
+
+res_df_rnapolii <- res_df_rnapolii %>%
+  mutate(sign_paste_genotype_gh = paste0(
+    "dsx-gh:",sign_log2FoldChange_RNAPolII_dsxmut_GH_genotype_ashr,
+    "_fru-gh:",sign_log2FoldChange_RNAPolII_frumut_GH_genotype_ashr,
+    "_Or47b-gh:",sign_log2FoldChange_RNAPolII_Or47bmut_GH_genotype_ashr,
+    "_Or67d-gh:",sign_log2FoldChange_RNAPolII_Or67dmut_GH_genotype_ashr),
+    sign_paste_genotype_sh = paste0(
+      "dsx-sh:",sign_log2FoldChange_RNAPolII_dsxmut_SH_genotype_ashr,
+      "_fru-sh:",sign_log2FoldChange_RNAPolII_frumut_SH_genotype_ashr,
+      "_Or47b-sh:",sign_log2FoldChange_RNAPolII_Or47bmut_SH_genotype_ashr,
+      "_Or67d-sh:",sign_log2FoldChange_RNAPolII_Or67dmut_SH_genotype_ashr),
+    sign_paste_genotype = paste0(
+      "dsx-gh:",sign_log2FoldChange_RNAPolII_dsxmut_GH_genotype_ashr,
+      "dsx-sh:",sign_log2FoldChange_RNAPolII_dsxmut_SH_genotype_ashr,
+      "_fru-gh:",sign_log2FoldChange_RNAPolII_frumut_GH_genotype_ashr,
+      "_fru-sh:",sign_log2FoldChange_RNAPolII_frumut_SH_genotype_ashr,
+      "_Or47b-gh:",sign_log2FoldChange_RNAPolII_Or47bmut_GH_genotype_ashr,
+      "_Or47b-sh:",sign_log2FoldChange_RNAPolII_Or47bmut_SH_genotype_ashr,
+      "_Or67d-gh:",sign_log2FoldChange_RNAPolII_Or67dmut_GH_genotype_ashr,
+      "_Or67d-sh:",sign_log2FoldChange_RNAPolII_Or67dmut_SH_genotype_ashr))
+
+```
+
+
+
+```{r}
+# Filter results dataframe to get significant lrt genotype regions
+# Select relevant columns for pairwise LogFC
+pairwise_log2fc_rnapolii_df <- res_df_rnapolii %>%
+  filter(padj_RNAPolII_genotype_lrt < 0.01) %>%
+  select(seqnames, start, end, sign_paste_genotype_gh,starts_with("log2FoldChange")) %>%
+  select(!contains("lrt")) %>%
+  select(!contains("housing")) %>%
+  select(!contains("_SH_"))
+
+# Filter by absolute Fold change
+# Create a matrix with only fold change 
+pairwise_log2fc_rnapolii_mat <- pairwise_log2fc_rnapolii_df %>%
+  select(starts_with("log2FoldChange"))
+# Make a logical filterl
+logfc_filter <- rowSums(abs(pairwise_log2fc_rnapolii_mat) > 1) >= 1
+
+# Filter out the dataframe
+pairwise_log2fc_rnapolii_df <- pairwise_log2fc_rnapolii_df %>%
+  filter(logfc_filter)
+
+# Change the column names for the data.frame to keeep only relevant info 
+colnames(pairwise_log2fc_rnapolii_df) <- str_remove(colnames(pairwise_log2fc_rnapolii_df), "log2FoldChange_")
+colnames(pairwise_log2fc_rnapolii_df) <- str_remove(colnames(pairwise_log2fc_rnapolii_df), "_genotype_ashr")
+colnames(pairwise_log2fc_rnapolii_df) <- str_remove(colnames(pairwise_log2fc_rnapolii_df), "_GH")
+colnames(pairwise_log2fc_rnapolii_df) <- str_remove(colnames(pairwise_log2fc_rnapolii_df), "RNAPolII_") 
+  colnames(pairwise_log2fc_rnapolii_df) <- str_remove(colnames(pairwise_log2fc_rnapolii_df), "mut") 
+
+
+colnames(pairwise_log2fc_rnapolii_df)
+```
+
+
+```{r}
+pairwise_log2fc_rnapolii_df <- pairwise_log2fc_rnapolii_df %>%
+  pivot_longer(cols = - c(seqnames, start, end,sign_paste_genotype_gh), names_to = "genotype",values_to = "log2FoldChange") %>%
+  mutate(gene_name = paste0(seqnames,":",start,"-",end))
+
+
+```
+
+```{r}
+sort(table(pairwise_log2fc_rnapolii_df$sign_paste_genotype_gh)) %>%
+  enframe() %>%
+  mutate(name = as.factor(name)) %>%
+  mutate(name = fct_reorder(name, sort(value))) %>%
+  ggplot(aes(value, name)) +
+  geom_col() +
+  ylab(NULL) +
+  xlab("N regions") +
+  ggtitle("Number of differential RNAPolII regions by sign combination")
+
+```
+
+
+```{r }
+
+
+pairwise_log2fc_rnapolii_df %>%
+  filter(seqnames %in% c("2L","2R","3L","3R","X")) %>%
+  mutate(log2FoldChange = case_when(
+    log2FoldChange > 1 ~ 1,
+    log2FoldChange < -1 ~ -1,
+    TRUE ~ log2FoldChange
+  )) %>%
+  ggplot(aes(genotype, gene_name, fill = log2FoldChange)) +
+  geom_tile() +  
+  scale_fill_gradient2(mid = "white",high = "red",low = "blue") +
+  theme_minimal() +
+  theme(aspect.ratio = 1,axis.text.y = element_blank()) +
+  facet_wrap(~sign_paste_genotype_gh , scales = "free") + 
+  ylab(NULL) +
+  xlab(NULL) +
+  ggtitle("RNAPolII")
+
+
+```
+
 
 
 
 # E Volcano plot for specific comparisons
 
+H3K4me3
 ```{r}
+volcplot_h3k4me3_dsx <- res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_dsxmut_GH_genotype_ashr, - 10 * log10(padj_H3K4me3_dsxmut_GH_genotype_ashr), color = padj_H3K4me3_dsxmut_GH_genotype_ashr < 0.01)) +
+  geom_point() +
+  ggtitle("dsx")+
+  theme_classic() +
+  theme(legend.position = "none", aspect.ratio = 1)+ 
+  ylim(c(0,250))
+
+volcplot_h3k4me3_fru <- res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_frumut_GH_genotype_ashr, - 10 * log10(padj_H3K4me3_frumut_GH_genotype_ashr), color = padj_H3K4me3_frumut_GH_genotype_ashr < 0.01)) +
+  geom_point() +
+    theme_classic() +
+  theme(legend.position = "none", aspect.ratio = 1)+
+  ggtitle("fru")+ 
+  ylim(c(0,250))
+
+volcplot_h3k4me3_or47b <- res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_Or47bmut_GH_genotype_ashr, - 10 * log10(padj_H3K4me3_Or47bmut_GH_genotype_ashr), color = padj_H3K4me3_Or47bmut_GH_genotype_ashr < 0.01)) +
+  geom_point() +
+    theme_classic() +
+
+  theme(legend.position = "none", aspect.ratio = 1)+
+  ggtitle("Or47b")+ 
+  ylim(c(0,250))
+
+volcplot_h3k4me3_or67d <- res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_Or67dmut_GH_genotype_ashr, - 10 * log10(padj_H3K4me3_Or67dmut_GH_genotype_ashr), color = padj_H3K4me3_Or67dmut_GH_genotype_ashr < 0.01)) +
+  geom_point() +
+    theme_classic() +
+
+  theme(legend.position = "none", aspect.ratio = 1)+
+  ggtitle("Or67d") + 
+  ylim(c(0,250))
+
+```
+
+```{r}
+volcplot_h3k4me3_dsx
+volcplot_h3k4me3_fru
+volcplot_h3k4me3_or47b
+volcplot_h3k4me3_or67d
 
 ```
 
 
+RNAPolII
+```{r}
+volcplot_rnapolii_dsx <- res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_dsxmut_GH_genotype_ashr, - 10 * log10(padj_RNAPolII_dsxmut_GH_genotype_ashr), color = padj_RNAPolII_dsxmut_GH_genotype_ashr < 0.05)) +
+  geom_point() +
+  ggtitle("dsx")+
+  theme_classic() +
+  theme(legend.position = "none", aspect.ratio = 1)+ 
+  ylim(c(0,200))
+
+volcplot_rnapolii_fru <- res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_frumut_GH_genotype_ashr, - 10 * log10(padj_RNAPolII_frumut_GH_genotype_ashr), color = padj_RNAPolII_frumut_GH_genotype_ashr < 0.05)) +
+  geom_point() +
+    theme_classic() +
+  theme(legend.position = "none", aspect.ratio = 1)+
+  ggtitle("fru")+ 
+  ylim(c(0,200))
+
+volcplot_rnapolii_or47b <- res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_Or47bmut_GH_genotype_ashr, - 10 * log10(padj_RNAPolII_Or47bmut_GH_genotype_ashr), color = padj_RNAPolII_Or47bmut_GH_genotype_ashr < 0.05)) +
+  geom_point() +
+    theme_classic() +
+
+  theme(legend.position = "none", aspect.ratio = 1)+
+  ggtitle("Or47b")+ 
+  ylim(c(0,200))
+
+volcplot_rnapolii_or67d <- res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_Or67dmut_GH_genotype_ashr, - 10 * log10(padj_RNAPolII_Or67dmut_GH_genotype_ashr), color = padj_RNAPolII_Or67dmut_GH_genotype_ashr < 0.05)) +
+  geom_point() +
+    theme_classic() +
+
+  theme(legend.position = "none", aspect.ratio = 1)+
+  ggtitle("Or67d") + 
+  ylim(c(0,200))
+
+```
+
+```{r}
+volcplot_rnapolii_dsx
+volcplot_rnapolii_fru
+volcplot_rnapolii_or47b
+volcplot_rnapolii_or67d
+
+```
+
+
+
 # G Venn diagrams for overlap of results for specific conditions
 
+UpSet
+```{r}
+library(UpSetR)
+
+all_comps_diff_list_h3k4me3 <- res_df_h3k4me3 %>%
+  select(starts_with("padj")) %>%
+  mutate(across(everything(),~ .x < 0.01)) %>%
+  as.list() %>%
+  map(which)
+
+all_comps_diff_list_h3k4me3 <- all_comps_diff_list_h3k4me3[map_dbl(all_comps_diff_list_h3k4me3,length) > 0]
+
+upset(fromList(all_comps_diff_list_h3k4me3),nsets = 16,nintersects = NA)
 
 
+```
+
+All
+```{r}
+upset(fromList(all_comps_diff_list_h3k4me3),nsets = 16,nintersects = NA)
+
+```
+
+Only Pairwise
+```{r}
+upset(fromList(all_comps_diff_list_h3k4me3)[!str_detect(names(all_comps_diff_list_h3k4me3), "lrt")],nsets = 16,nintersects = NA)
+
+```
+
+Pairwise GH
+```{r}
+upset(fromList(all_comps_diff_list_h3k4me3)[!str_detect(names(all_comps_diff_list_h3k4me3), "lrt") & str_detect(names(all_comps_diff_list_h3k4me3), "GH")],nsets = 16,nintersects = NA)
+```
+
+Pairwise SH
+
+```{r}
+upset(fromList(all_comps_diff_list_h3k4me3)[!str_detect(names(all_comps_diff_list_h3k4me3), "lrt") & str_detect(names(all_comps_diff_list_h3k4me3), "_SH_")],nsets = 16,nintersects = NA)
+```
+
+Pairwise within genotype
+
+```{r}
+upset(fromList(all_comps_diff_list_h3k4me3)[!str_detect(names(all_comps_diff_list_h3k4me3), "lrt") & str_detect(names(all_comps_diff_list_h3k4me3), "fru")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_h3k4me3)[!str_detect(names(all_comps_diff_list_h3k4me3), "lrt") & str_detect(names(all_comps_diff_list_h3k4me3), "dsx")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_h3k4me3)[!str_detect(names(all_comps_diff_list_h3k4me3), "lrt") & str_detect(names(all_comps_diff_list_h3k4me3), "47b")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_h3k4me3)[!str_detect(names(all_comps_diff_list_h3k4me3), "lrt") & str_detect(names(all_comps_diff_list_h3k4me3), "67d")],nsets = 16,nintersects = NA)
+
+```
+```{r}
+upset(fromList(all_comps_diff_list_h3k4me3)[str_detect(names(all_comps_diff_list_h3k4me3), "lrt") | str_detect(names(all_comps_diff_list_h3k4me3), "fru")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_h3k4me3)[str_detect(names(all_comps_diff_list_h3k4me3), "lrt") | str_detect(names(all_comps_diff_list_h3k4me3), "dsx")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_h3k4me3)[str_detect(names(all_comps_diff_list_h3k4me3), "lrt") | str_detect(names(all_comps_diff_list_h3k4me3), "47b")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_h3k4me3)[str_detect(names(all_comps_diff_list_h3k4me3), "lrt") | str_detect(names(all_comps_diff_list_h3k4me3), "67d")],nsets = 16,nintersects = NA)
+
+```
+
+
+UpSet
+```{r}
+library("UpSetR")
+library("ggVennDiagram")
+
+all_comps_diff_list_rnapolii <- res_df_rnapolii %>%
+  select(starts_with("padj")) %>%
+  mutate(across(everything(),~ .x < 0.01)) %>%
+  as.list() %>%
+  map(which)
+
+all_comps_diff_list_rnapolii <- all_comps_diff_list_rnapolii[map_dbl(all_comps_diff_list_rnapolii,length) > 0]
+
+names(all_comps_diff_list_rnapolii) <- str_remove(names(all_comps_diff_list_rnapolii),"padj_RNAPolII_")
+names(all_comps_diff_list_rnapolii) <- str_remove(names(all_comps_diff_list_rnapolii),"_genotype_ashr")
+names(all_comps_diff_list_rnapolii) <- str_remove(names(all_comps_diff_list_rnapolii),"mut")
+
+```
+
+All
+```{r}
+upset(fromList(all_comps_diff_list_rnapolii),nsets = 16,nintersects = NA)
+
+ggVennDiagram::ggVennDiagram(all_comps_diff_list_rnapolii)
+
+```
+
+
+Only Pairwise
+```{r}
+upset(fromList(all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt")],nsets = 16,nintersects = NA)
+
+ggVennDiagram(all_comps_diff_list_rnapolii[!str_detect(names(all_comps_diff_list_rnapolii), "lrt")])
+```
+
+
+
+
+Pairwise GH
+```{r}
+upset(fromList(all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "GH")],nsets = 16,nintersects = NA)
+
+ggVennDiagram((all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "GH")])+
+  scale_fill_viridis_c()
+```
+
+
+
+Pairwise SH
+
+```{r}
+upset(fromList(all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "_SH")],nsets = 16,nintersects = NA)
+
+ggVennDiagram((all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "_SH")]) +
+  scale_fill_viridis_c()
+
+```
+
+Pairwise within genotype
+
+```{r}
+upset(fromList(all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "fru")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "dsx")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "47b")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "67d")],nsets = 16,nintersects = NA)
+
+```
+```{r}
+ggVennDiagram((all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "fru")]) +
+  scale_fill_viridis_c()
+ggVennDiagram((all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "dsx")])+
+  scale_fill_viridis_c()
+ggVennDiagram((all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "47b")])+
+  scale_fill_viridis_c()
+ggVennDiagram((all_comps_diff_list_rnapolii)[!str_detect(names(all_comps_diff_list_rnapolii), "lrt") & str_detect(names(all_comps_diff_list_rnapolii), "67d")])+
+  scale_fill_viridis_c()
+
+```
+
+
+
+
+```{r}
+upset(fromList(all_comps_diff_list_rnapolii)[str_detect(names(all_comps_diff_list_rnapolii), "lrt") | str_detect(names(all_comps_diff_list_rnapolii), "fru")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_rnapolii)[str_detect(names(all_comps_diff_list_rnapolii), "lrt") | str_detect(names(all_comps_diff_list_rnapolii), "dsx")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_rnapolii)[str_detect(names(all_comps_diff_list_rnapolii), "lrt") | str_detect(names(all_comps_diff_list_rnapolii), "47b")],nsets = 16,nintersects = NA)
+upset(fromList(all_comps_diff_list_rnapolii)[str_detect(names(all_comps_diff_list_rnapolii), "lrt") | str_detect(names(all_comps_diff_list_rnapolii), "67d")],nsets = 16,nintersects = NA)
+
+```
+
+
+```{r}
+ggVennDiagram((all_comps_diff_list_rnapolii)[str_detect(names(all_comps_diff_list_rnapolii), "lrt") | str_detect(names(all_comps_diff_list_rnapolii), "fru")])+
+  scale_fill_viridis_c()
+ggVennDiagram((all_comps_diff_list_rnapolii)[str_detect(names(all_comps_diff_list_rnapolii), "lrt") | str_detect(names(all_comps_diff_list_rnapolii), "dsx")])+
+  scale_fill_viridis_c()
+ggVennDiagram((all_comps_diff_list_rnapolii)[str_detect(names(all_comps_diff_list_rnapolii), "lrt") | str_detect(names(all_comps_diff_list_rnapolii), "47b")])+
+  scale_fill_viridis_c()
+ggVennDiagram((all_comps_diff_list_rnapolii)[str_detect(names(all_comps_diff_list_rnapolii), "lrt") | str_detect(names(all_comps_diff_list_rnapolii), "67d")])+
+  scale_fill_viridis_c()
+
+```
 
 # Plots not made in R
 ## A Overview

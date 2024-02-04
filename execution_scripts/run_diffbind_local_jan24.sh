@@ -1,11 +1,11 @@
-counts_path=./data_input/2024-01_diff_cutandrun_data_output/
+counts_path=./data_output/2024-01_diff_cutandrun_data_output/
 
 for rds in ${counts_path}*seacrigg*Rds;
   do 
     echo $rds;
     basename=${rds##*/}
     basename=${basename%.*}
-    Rscript ./scripts/diffbind_step2c_test_wald.R $basename data_output/2024-01_diffbind_cutnrun/ $rds;
+    Rscript ./scripts/diffbind_step2c_test_wald_housing.R $basename data_output/2024-01_diffbind_cutnrun/ $rds;
   done
 
 for rds in ${counts_path}*seacrigg*Rds;
@@ -15,7 +15,6 @@ for rds in ${counts_path}*seacrigg*Rds;
     basename=${basename%.*}
     Rscript ./scripts/diffbind_step2d_test_wald_genotype.R $basename data_output/2024-01_diffbind_cutnrun/ $rds;
   done
-
 
 
 for rds in ${counts_path}*seacrigg*Rds;
@@ -42,4 +41,5 @@ for rds in ${counts_path}*seacrigg*Rds;
     Rscript ./scripts/diffbind_step2b_test_lrt.R ${basename}_genotype data_output/2024-01_diffbind_cutnrun/ $rds "~ housing + genotype" "~housing";
   done
 
+Rscript ./scripts/helper_reshape_res_from_list_to_df.R
 
