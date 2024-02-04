@@ -4,7 +4,7 @@ library(tidyverse)
 
 # Rename columns of data frame with by appending .y except for the first 3 columns
 rename_cols_after3 <- function(.x,.y){
-  colnames(.x) <- c(colnames(.x[,c(1:3)]), paste0(colnames(.x[,-c(1:3)]),.y))
+  colnames(.x) <- c(colnames(.x[,c(1:3)]), paste0(colnames(.x[,-c(1:3)]),"_",.y))
   return(.x)
 }
 
