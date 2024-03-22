@@ -1,0 +1,725 @@
+---
+title: "GO term heatmaps"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    df_print: paged
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, warning = FALSE, message = FALSE
+)
+```
+
+
+```{r}
+# Libraries
+
+library(ComplexHeatmap) # Heatmaps
+library(DESeq2) 
+library(ggVennDiagram) 
+library(clusterProfiler) # Go terms
+library(org.Dm.eg.db) # GO annotation
+library(tidyverse)
+library(circlize) # Colors
+```
+
+
+```{r}
+# Functions
+
+# plot z score matrix
+plot_heatmap <- function(mat, ...) {
+  Heatmap(mat = t(scale(t(mat),center = TRUE,scale = TRUE)), # z score
+          cluster_columns = FALSE,
+          heatmap_legend_param = list(title = "Z score",
+                                      legend_height = unit(2, "in")), ... )
+}
+# log2fc matrix
+plot_heatmap_log2fc <- function(mat, ...) {
+  Heatmap(mat = mat,
+          cluster_columns = FALSE,
+          heatmap_legend_param = list(title = "log2FC",
+                                      legend_height = unit(2, "in")) , ... )
+}
+
+
+```
+
+```{r}
+data_dir <- "../data_output/2024-1_diffexpr_input/"
+```
+
+
+```{r}
+#DESeq files raw
+deseq_files <- list.files(data_dir,pattern = "[^$]+rds")
+deseq_list <- lapply(paste0(data_dir,deseq_files), readRDS)
+names(deseq_list) <- deseq_files
+```
+
+
+
+```{r}
+#DESeq files fitted 
+deseq_obj_fitted <- readRDS("../data_output/2024-1_diffexpr_output/social_mutants_housing_lrt_deseq_obj_fitted.Rds")
+```
+
+```{r}
+# Results joined files
+
+res_df <- read_tsv(file = "../data_output/2024-1_diffexpr_output/res_df_all_join.tsv")
+```
+
+
+```{r}
+# Data re-shaping
+
+## Add entrezid column
+
+symbol_etrez_map_df <- clusterProfiler::bitr(geneID = res_df$gene_name, fromType = "SYMBOL",toType ="ENTREZID",OrgDb = org.Dm.eg.db )
+symbol_etrez_map <- symbol_etrez_map_df$ENTREZ 
+names(symbol_etrez_map) <-  symbol_etrez_map_df$SYMBOL
+
+res_df$entrezid <- symbol_etrez_map[res_df$gene_name]
+
+```
+
+
+```{r}
+# Pivot Longer
+
+## Data transform for volcano plots
+
+log2fc_long <- res_df %>%
+  dplyr::select(gene_name,entrezid, starts_with("log2FoldChange")) %>%
+  pivot_longer(c(-gene_name,-entrezid), names_to = "comparison", values_to = "log2FoldChange") %>%
+  mutate(comparison = str_remove(comparison,"log2FoldChange_" ))
+
+rawlog2fc_long <- res_df %>%
+  dplyr::select(gene_name,entrezid, starts_with("rawlog2FoldChange")) %>%
+  pivot_longer(c(-gene_name,-entrezid), names_to = "comparison", values_to = "rawlog2FoldChange") %>%
+  mutate(comparison = str_remove(comparison,"rawlog2FoldChange_" ))
+
+padj_long <- res_df %>%
+  dplyr::select(gene_name,entrezid, starts_with("padj")) %>%
+  pivot_longer(c(-gene_name,-entrezid), names_to = "comparison", values_to = "padj") %>%
+  mutate(comparison = str_remove(comparison,"padj_" ))
+
+pval_long <- res_df %>%
+  dplyr::select(gene_name,entrezid, starts_with("pvalue")) %>%
+  pivot_longer(c(-gene_name,-entrezid), names_to = "comparison", values_to = "pvalue") %>%
+  mutate(comparison = str_remove(comparison,"pvalue_" ))
+
+basemean_long <- res_df %>%
+  dplyr::select(gene_name,entrezid, starts_with("baseMean")) %>%
+  pivot_longer(c(-gene_name,-entrezid), names_to = "comparison", values_to = "baseMean") %>%
+  mutate(comparison = str_remove(comparison,"baseMean_" ))
+
+
+res_long_list <- list(basemean_long,rawlog2fc_long, log2fc_long, padj_long, pval_long)
+res_long_df <- purrr::reduce(res_long_list,left_join,by =c("gene_name","entrezid","comparison") )
+```
+
+```{r}
+
+# Make lists for different combinations of comparisons
+
+
+# Get all genes that are diff expressed in at least one comparison
+
+
+res_long_df_diff_any <- res_long_df %>%
+  drop_na(padj) %>%
+  filter(padj < 0.05 & abs(log2FoldChange) > 0.2)
+```
+
+```{r}
+# Housing within the same genotype
+
+## All
+
+
+comp_list_housing_all_symbol <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"housing") & ! str_detect(comparison,"lrt")) %>%
+  dplyr::select(gene_name, comparison) %>%
+  mutate(comparison = str_remove(comparison, "_housing")) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list_housing_all_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"housing") & ! str_detect(comparison,"lrt")) %>%
+  dplyr::select(entrezid, comparison) %>%
+    mutate(comparison = str_remove(comparison, "_housing")) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+
+```
+
+```{r}
+
+## Up
+
+comp_list_housing_up_symbol <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"housing") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange > 0) %>%
+  dplyr::select(gene_name, comparison) %>%
+    mutate(comparison = str_remove(comparison, "_housing")) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list_housing_up_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"housing") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange > 0) %>%
+  dplyr::select(entrezid, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_housing")) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+
+```
+
+
+```{r}
+## Down
+
+comp_list_housing_down_symbol <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"housing") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange < 0) %>%
+  dplyr::select(gene_name, comparison) %>%
+    mutate(comparison = str_remove(comparison, "_housing")) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list_housing_down_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"housing") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange < 0) %>%
+  dplyr::select(entrezid, comparison) %>%
+    mutate(comparison = str_remove(comparison, "_housing")) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+```
+
+```{r}
+## GH: all to CS
+
+### All
+
+comp_list_genotype_gh_all_symbol <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_GH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  dplyr::select(gene_name, comparison) %>%
+    mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list_genotype_gh_all_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_GH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  dplyr::select(entrezid, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+
+```
+
+```{r}
+
+### Up
+
+comp_list_genotype_gh_up_symbol <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_GH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange > 0) %>%
+  dplyr::select(gene_name, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list_genotype_gh_up_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_GH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange > 0) %>%
+  dplyr::select(entrezid, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+```
+
+```{r}
+### Down
+
+comp_list_genotype_gh_down_symbol <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_GH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange < 0) %>%
+  dplyr::select(gene_name, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list_genotype_gh_down_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_GH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange < 0) %>%
+  dplyr::select(entrezid, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+
+```
+
+```{r}
+
+## SH: all to CS
+
+
+### All
+
+comp_list_genotype_sh_all_symbol <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_SH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  dplyr::select(gene_name, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list_genotype_sh_all_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_SH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  dplyr::select(entrezid, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+
+```
+
+```{r}
+
+### Up
+
+comp_list_genotype_sh_up_symbol <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_SH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange > 0) %>%
+  dplyr::select(gene_name, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list_genotype_sh_up_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_SH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange > 0) %>%
+  dplyr::select(entrezid, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+```
+
+```{r}
+### Down
+
+comp_list_genotype_sh_down_symbol <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_SH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange < 0) %>%
+  dplyr::select(gene_name, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list_genotype_sh_down_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"_SH") & str_detect(comparison,"genotype") & ! str_detect(comparison,"lrt")) %>%
+  filter(log2FoldChange < 0) %>%
+  dplyr::select(entrezid, comparison) %>%
+      mutate(comparison = str_remove(comparison, "_genotype")) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+
+```
+
+
+```{r}
+# Heatmaps:
+
+## Data re-shaping
+
+### Build norm counts z score matrix
+
+norm_cts <- counts(deseq_obj_fitted,norm =TRUE)
+```
+
+```{r}
+de_cs_genes_id <- res_long_df %>%
+  dplyr::select(gene_name, comparison, padj, log2FoldChange) %>%
+  filter(comparison == "CS_housing") %>%
+  filter(padj < 0.05 & abs(log2FoldChange) > 0.2) %>%
+  arrange(log2FoldChange) %>%
+  pull(gene_name) %>%
+  unique()
+
+de_genotype_gh_genes_id <- res_long_df %>%
+  dplyr::select(gene_name, comparison, padj, log2FoldChange) %>%
+  filter(str_detect(comparison, "GH_genotype")) %>%
+  filter(padj < 0.05 & abs(log2FoldChange) > 0.2) %>%
+  pull(gene_name) %>%
+  unique()
+
+de_genotype_sh_genes_id <- res_long_df %>%
+  dplyr::select(gene_name, comparison, padj, log2FoldChange) %>%
+  filter(str_detect(comparison, "SH_genotype")) %>%
+  filter(padj < 0.05 & abs(log2FoldChange) > 0.2) %>%
+  pull(gene_name) %>%
+  unique()
+
+```
+
+
+```{r}
+# Norm counts median per group
+
+
+# Remove rows with zero counts
+norm_cts_filt <- norm_cts[rowSums(norm_cts) > 0,]
+
+# Get mean matrix
+norm_cts_median <- as.data.frame(norm_cts_filt) %>% # convert matrix to data frame, makes it compatible with dplyr
+  rownames_to_column(var = "gene_symbol") %>% # move rownames to a new column, makes it compatible with dplyr 
+  pivot_longer(cols = -gene_symbol, # make data.frame in tidy format
+               names_to = "sample_name",
+               values_to = "normalizedCounts") %>% 
+  mutate(condition = str_remove(sample_name, "_R\\d$")) %>% # Make condition variables 
+  group_by(gene_symbol, condition) %>% # Group by experimental condition 
+  summarise(normalizedCounts_median = median(normalizedCounts)) %>% # Calculate mean per groups 
+  pivot_wider(names_from = condition, # Return from tidy to matrix format 
+              values_from = normalizedCounts_median)
+# process matrix further as a numeric matrix format with rownames, compatible with ComplexHeatmap
+norm_cts_median <- as.data.frame(norm_cts_median) 
+rownames(norm_cts_median) <- norm_cts_median$gene_symbol
+norm_cts_median <- norm_cts_median %>%
+  dplyr::select(- gene_symbol)
+norm_cts_median <- as.matrix(norm_cts_median)
+
+# Get factor with genotype info to use to separate heatmap into subsections
+genotype_split <-  str_split(colnames(norm_cts_median),"_",n = 2) %>% map_chr(1)
+
+```
+
+```{r}
+### Build log2Fold change matrix
+# Select only log2FoldChane variables
+
+log2fc_mat_housing <- res_df %>%
+  drop_na(padj_CS_housing) %>%
+  filter(padj_CS_housing < 0.05 & abs(log2FoldChange_CS_housing) > 0.2) %>%
+  dplyr::select(gene_name, starts_with("log2FoldChange") & contains("housing") & ! contains("lrt")) %>%
+  arrange(log2FoldChange_CS_housing) %>%
+  column_to_rownames(var = "gene_name") %>%
+  as.matrix()
+
+log2fc_mat_genotype_gh<- res_df %>%
+    filter(padj_DSX_GH_genotype < 0.05 | 
+           padj_FRU_GH_genotype < 0.05 |
+           padj_Or67d_GH_genotype < 0.05 |
+           padj_Or47b_GH_genotype) %>%
+  dplyr::select(gene_name, starts_with("log2FoldChange") & contains("GH_genotype") & ! contains("lrt")) %>%
+  column_to_rownames(var = "gene_name") %>%
+  as.matrix()
+
+log2fc_mat_genotype_sh<- res_df %>%
+      filter(padj_DSX_SH_genotype < 0.05 | 
+           padj_FRU_SH_genotype < 0.05 |
+           padj_Or67d_SH_genotype < 0.05 |
+           padj_Or47b_SH_genotype) %>%
+  dplyr::select(gene_name, starts_with("log2FoldChange") & contains("SH_genotype") & ! contains("lrt")) %>%
+  column_to_rownames(var = "gene_name") %>%
+  as.matrix()
+
+colnames(log2fc_mat_housing) <- str_remove(colnames(log2fc_mat_housing) ,"log2FoldChange_")
+colnames(log2fc_mat_housing) <- str_remove(colnames(log2fc_mat_housing) ,"_housing")
+
+colnames(log2fc_mat_genotype_gh) <- str_remove(colnames(log2fc_mat_genotype_gh) ,"log2FoldChange_")
+colnames(log2fc_mat_genotype_gh) <- str_remove(colnames(log2fc_mat_genotype_gh) ,"_genotype")
+
+colnames(log2fc_mat_genotype_sh) <- str_remove(colnames(log2fc_mat_genotype_sh) ,"log2FoldChange_")
+colnames(log2fc_mat_genotype_sh) <- str_remove(colnames(log2fc_mat_genotype_sh) ,"_genotype")
+```
+
+
+```{r}
+### Read target genes
+
+#### go
+
+
+symbol_ensembl_map_df <- clusterProfiler::bitr(geneID = res_df$gene_name, fromType = "SYMBOL",toType ="ENSEMBL",OrgDb = org.Dm.eg.db )
+symbol_ensembl_map <- symbol_ensembl_map_df$SYMBOL 
+names(symbol_ensembl_map) <-  symbol_ensembl_map_df$ENSEMBL
+
+
+
+
+```
+
+
+
+```{r}
+# autophagy
+
+autophagy_genes <- readLines("../data_input/gene_annotations/2024-02_autophagy_stress_response_go_terms/autophagy_go_terms.txt")
+
+autophagy_genes <- symbol_ensembl_map[autophagy_genes]
+autophagy_genes <- na.omit(autophagy_genes)
+autophagy_genes <- autophagy_genes[autophagy_genes %in% res_df$gene_name]
+
+```
+
+
+```{r}
+# stress response
+
+oxidative_stress_esponse_genes <- readLines("../data_input/gene_annotations/2024-02_autophagy_stress_response_go_terms/response_to_oxidative_stress_go_terms.txt")
+oxidative_stress_esponse_genes <- symbol_ensembl_map[oxidative_stress_esponse_genes]
+
+oxidative_stress_esponse_genes <- na.omit(oxidative_stress_esponse_genes)
+
+oxidative_stress_esponse_genes <- oxidative_stress_esponse_genes[oxidative_stress_esponse_genes %in% res_df$gene_name]
+
+```
+
+
+```{r}
+# ribosomal proteins
+
+ribosomal_genes <- readLines("../data_input/gene_annotations/2024-02_autophagy_stress_response_go_terms/ribosomal_subunit_go_terms.txt")
+ribosomal_genes <- symbol_ensembl_map[ribosomal_genes]
+
+ribosomal_genes <- na.omit(ribosomal_genes)
+
+ribosomal_genes <- ribosomal_genes[ribosomal_genes %in% res_df$gene_name]
+
+```
+
+# GO annotations
+
+Annotations for go terms were obtained from:
+
+Autophagy: https://flybase.org/cgi-bin/cvreport.pl?rel=is_a&id=GO:0006979
+
+Response to oxidative stress: https://flybase.org/cgi-bin/cvreport.pl?rel=is_a&id=GO:0006979
+
+Ribosomal subunit: https://flybase.org/cgi-bin/cvreport.pl?rel=is_a&id=GO:0044391
+
+
+# Comparison: Housing SH/GH
+
+The following heatmaps show Differential genes CantonS SH / CantonS GH, subset by whether they are annotated with a specific GO category.
+
+Genes are considered differentially expressed if they are adjusted p value < 0.05, and absolute log2 fold change > 0.2.
+
+## Z score matrix
+
+Replicates were merged summarizing by the median per experimental group.
+
+### autophagy
+
+
+```{r }
+
+plot_heatmap(norm_cts_median[autophagy_genes[autophagy_genes %in% de_cs_genes_id],], show_row_names = TRUE, cluster_rows = TRUE, column_title = "Autophagy\n CS_SH / CS_GH differentially expressed genes")
+
+```
+
+### oxidative stress response
+
+```{r }
+
+plot_heatmap(norm_cts_median[oxidative_stress_esponse_genes[oxidative_stress_esponse_genes %in% de_cs_genes_id],,drop = FALSE], show_row_names = TRUE, cluster_rows = TRUE,  column_title = "Oxidative Stress Response \n CS_SH / CS_GH differentially expressed genes")
+
+```
+
+### ribosomal proteins
+
+```{r }
+
+plot_heatmap(norm_cts_median[ribosomal_genes[ribosomal_genes %in% de_cs_genes_id],,drop = FALSE], show_row_names = TRUE, cluster_rows = TRUE,  column_title = "Ribosomal Proteins \n CS_SH / CS_GH differentially expressed genes")
+
+```
+
+## log2FoldChange matrix
+
+### autophagy
+
+```{r fig.height= 3}
+
+plot_heatmap_log2fc(log2fc_mat_housing[autophagy_genes[autophagy_genes %in% de_cs_genes_id],,drop = FALSE],
+                    cluster_rows = FALSE,
+                    col = colorRamp2(breaks = c(-1,0,1),
+                                     colors = c("blue","white","red")),
+                    show_row_names = TRUE, column_title = "Autophagy\n CS_SH / CS_GH differentially expressed genes")
+```
+
+### oxidative stress response
+
+```{r fig.height= 3}
+
+plot_heatmap_log2fc(log2fc_mat_housing[oxidative_stress_esponse_genes[oxidative_stress_esponse_genes %in% de_cs_genes_id],,drop = FALSE],
+                    cluster_rows = FALSE,
+                    col = colorRamp2(breaks = c(-1,0,1),
+                                     colors = c("blue","white","red")),
+                    show_row_names = TRUE,  column_title = "Oxidative Stress Response \n CS_SH / CS_GH differentially expressed genes")
+```
+
+### ribosomal proteins
+
+```{r fig.height= 3}
+
+plot_heatmap_log2fc(log2fc_mat_housing[ribosomal_genes[ribosomal_genes %in% de_cs_genes_id],,drop = FALSE],
+                    cluster_rows = FALSE,
+                    col = colorRamp2(breaks = c(-1,0,1),
+                                     colors = c("blue","white","red")),
+                    show_row_names = TRUE,  column_title = "Ribosomal Proteins \n CS_SH / CS_GH differentially expressed genes")
+```
+
+
+# Comparison: each mutant GH vs CantonS GH
+
+The following heatmaps show Differential genes Mutant GH / CantonS GH, subset by whether they are annotated with a specific GO category.
+
+## Z score matrix
+
+### autophagy
+
+```{r fig.height= 7}
+plot_heatmap(norm_cts_median[autophagy_genes[autophagy_genes %in% de_genotype_gh_genes_id],], show_row_names = TRUE, cluster_rows = TRUE, column_title = "Autophagy\n Mutant_GH / CS_GH differentially expressed genes")
+
+```
+
+### oxidative stress response
+
+```{r fig.height= 8}
+plot_heatmap(norm_cts_median[oxidative_stress_esponse_genes[oxidative_stress_esponse_genes %in% de_genotype_gh_genes_id],], show_row_names = TRUE, cluster_rows = TRUE, column_title = "Oxidative stress response Mutant_GH / CS_GH differentially expressed genes")
+
+```
+
+### ribosomal proteins
+
+```{r fig.height= 7}
+plot_heatmap(norm_cts_median[ribosomal_genes[ribosomal_genes %in% de_genotype_gh_genes_id],], show_row_names = TRUE, cluster_rows = TRUE, column_title = "Ribosomal proteins \n Mutant_GH / CS_GH differentially expressed genes")
+
+```
+
+## log2FoldChange matrix
+
+### autophagy
+
+```{r fig.height= 7}
+plot_heatmap_log2fc(log2fc_mat_genotype_gh[autophagy_genes[autophagy_genes %in% de_genotype_gh_genes_id],],
+                    cluster_rows = TRUE,
+                    col = colorRamp2(breaks = c(-1,0,1),
+                                     colors = c("blue","white","red")),
+                    show_row_names = TRUE, column_title = "Autophagy\n Mutant_GH / CS_GH differentially expressed genes")
+```
+
+### oxidative stress response
+
+```{r fig.height= 8}
+plot_heatmap_log2fc(log2fc_mat_genotype_gh[oxidative_stress_esponse_genes[oxidative_stress_esponse_genes %in% de_genotype_gh_genes_id],],
+                    cluster_rows = TRUE,
+                    col = colorRamp2(breaks = c(-1,0,1),
+                                     colors = c("blue","white","red")),
+                    show_row_names = TRUE, column_title = "Oxidative stress response \n Mutant_GH / CS_GH differentially expressed genes")
+```
+
+### ribosomal proteins
+
+```{r fig.height= 7}
+plot_heatmap_log2fc(log2fc_mat_genotype_gh[ribosomal_genes[ribosomal_genes %in% de_genotype_gh_genes_id],],
+                    cluster_rows = TRUE,
+                    col = colorRamp2(breaks = c(-1,0,1),
+                                     colors = c("blue","white","red")),
+                    show_row_names = TRUE, column_title = "Ribosomal proteins \n Mutant_GH / CS_GH differentially expressed genes")
+```
+
+# Comparison: each mutant SH vs CantonS SH
+
+The following heatmaps show Differential genes Mutant SH / CantonS SH, subset by whether they are annotated with a specific GO category
+
+## Z score matrix
+
+### autophagy
+
+```{r fig.height= 10}
+plot_heatmap(norm_cts_median[autophagy_genes[autophagy_genes %in% de_genotype_sh_genes_id],], show_row_names = TRUE, cluster_rows = TRUE, column_title = "Autophagy\n Mutant_SH / CS_SH differentially expressed genes")
+
+```
+
+### oxidative stress response
+
+```{r fig.height= 10}
+plot_heatmap(norm_cts_median[oxidative_stress_esponse_genes[oxidative_stress_esponse_genes %in% de_genotype_sh_genes_id],], show_row_names = TRUE, cluster_rows = TRUE, column_title = "Oxidative stress response \n Mutant_SH / CS_SH differentially expressed genes")
+
+```
+
+### ribosomal proteins
+
+```{r fig.height= 10}
+plot_heatmap(norm_cts_median[ribosomal_genes[ribosomal_genes %in% de_genotype_sh_genes_id],], show_row_names = TRUE, cluster_rows = TRUE, column_title = "Ribosomal proteins \n Mutant_SH / CS_SH differentially expressed genes")
+
+```
+
+## log2FoldChange matrix
+
+### autophagy
+
+```{r fig.height= 10}
+plot_heatmap_log2fc(log2fc_mat_genotype_sh[autophagy_genes[autophagy_genes %in% de_genotype_sh_genes_id],],
+                    cluster_rows = TRUE,
+                    col = colorRamp2(breaks = c(-1,0,1),
+                                     colors = c("blue","white","red")),
+                    show_row_names = TRUE, column_title = "Autophagy\n Mutant_SH / CS_SH differentially expressed genes")
+```
+
+### oxidative stress response
+
+```{r fig.height= 9}
+plot_heatmap_log2fc(log2fc_mat_genotype_sh[oxidative_stress_esponse_genes[oxidative_stress_esponse_genes %in% de_genotype_sh_genes_id],],
+                    cluster_rows = TRUE,
+                    col = colorRamp2(breaks = c(-1,0,1),
+                                     colors = c("blue","white","red")),
+                    show_row_names = TRUE, column_title = "Oxidative stress response \n Mutant_SH / CS_SH differentially expressed genes")
+```
+
+### ribosomal proteins
+
+```{r fig.height= 10}
+plot_heatmap_log2fc(log2fc_mat_genotype_sh[ribosomal_genes[ribosomal_genes %in% de_genotype_sh_genes_id],],
+                    cluster_rows = TRUE,
+                    col = colorRamp2(breaks = c(-1,0,1),
+                                     colors = c("blue","white","red")),
+                    show_row_names = TRUE, column_title = "Ribosomal proteins \n Mutant_SH / CS_SH differentially expressed genes")
+```
+
+# DESEQ2 Results for each gene
+
+Annotations for go terms were obtained from:
+
+Autophagy: https://flybase.org/cgi-bin/cvreport.pl?rel=is_a&id=GO:0006979
+
+Response to oxidative stress: https://flybase.org/cgi-bin/cvreport.pl?rel=is_a&id=GO:0006979
+
+Ribosomal subunit: https://flybase.org/cgi-bin/cvreport.pl?rel=is_a&id=GO:0044391
+
+
+## Autophagy
+
+```{r}
+res_df %>%
+  filter(gene_name %in% autophagy_genes) %>%
+  filter(padj_CS_housing <0.05 & abs(log2FoldChange_CS_housing ) > 0.2)
+```
+
+## Response to oxidative stress
+
+```{r}
+res_df %>%
+  filter(gene_name %in% oxidative_stress_esponse_genes)
+```
+
+## Ribosomal subunit
+```{r}
+res_df %>%
+  filter(gene_name %in% ribosomal_genes)
+```
