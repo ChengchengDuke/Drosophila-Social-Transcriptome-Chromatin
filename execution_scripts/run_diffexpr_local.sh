@@ -2,6 +2,10 @@ counts_path=./data_output/2024-1_diffexpr_input/
 rds=${counts_path}social_mutants.salmon.merged.gene_counts.rds
 basename=social_mutants
 
+# Make output path
+mkdir $counts_path
+mkdir data_output/2024-1_diffexpr_output/
+
 # Build deseq obj
 Rscript ./scripts/diffexpr/diffexpr_helper1_build_deseqobj.R
 
