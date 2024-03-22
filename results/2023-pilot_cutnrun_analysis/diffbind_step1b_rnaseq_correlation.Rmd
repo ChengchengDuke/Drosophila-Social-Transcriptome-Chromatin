@@ -1,0 +1,256 @@
+---
+title: "diffbind_step1b_rna_correlation"
+output: html_document
+date: '2023-02-19'
+---
+
+# Libraries
+```{r}
+library(tidyverse)
+library(plyranges)
+library(org.Dm.eg.db)
+library(GenomicFeatures)
+library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
+
+```
+
+# Functions
+
+# Read RNA
+```{r}
+res_housing_cs_combat <- read_tsv("~/repos/rnaseq_social_isolation/data_output/combat/combat_results_3aug22/res_housing_cs_combat.tsv")
+
+```
+
+```{r}
+
+gene_id_map <- clusterProfiler::bitr(fromType = "ENSEMBL",toType = "SYMBOL",geneID = res_housing_cs_combat$geneid,OrgDb = org.Dm.eg.db)
+
+
+res_housing_cs_combat <- res_housing_cs_combat[res_housing_cs_combat$geneid %in% gene_id_map$ENSEMBL,]
+
+res_housing_cs_combat <- left_join(res_housing_cs_combat,gene_id_map,by = c("geneid" = "SYMBOL"))
+
+promoters_dm6 <- promoters(genes(TxDb.Dmelanogaster.UCSC.dm6.ensGene),upstream = 1,downstream = 1)
+
+
+res_housing_cs_combat <- res_housing_cs_combat[res_housing_cs_combat$geneid %in% names(promoters_dm6),]
+
+
+promoters_dm6 <- promoters_dm6[res_housing_cs_combat$geneid]
+
+elementMetadata(promoters_dm6) <- DataFrame(res_housing_cs_combat)
+
+```
+
+
+# Read CUT&RUN seacr IgG peaks results
+```{r}
+seacrigg_h3k27ac <- makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_H3K27ac_seacrigg_peaks_union_deseq_counts_ashr.tsv"),keep.extra.columns = TRUE)
+
+seacrigg_h3k4me3 <-  makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_H3K4me3_seacrigg_peaks_union_deseq_counts_ashr.tsv") ,keep.extra.columns = TRUE)
+seacrigg_rnapolii <-  makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_RNAPolII_seacrigg_peaks_union_deseq_counts_ashr.tsv"),keep.extra.columns = TRUE)
+
+
+seacrigg_h3k27acIgG <- makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_H3K27acIgG_seacrigg_peaks_union_deseq_counts_ashr.tsv"),keep.extra.columns = TRUE)
+
+seacrigg_h3k4me3IgG <-  makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_H3K4me3IgG_seacrigg_peaks_union_deseq_counts_ashr.tsv") ,keep.extra.columns = TRUE)
+seacrigg_rnapoliiIgG <-  makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_RNAPolIIIgG_seacrigg_peaks_union_deseq_counts_ashr.tsv"),keep.extra.columns = TRUE)
+
+
+```
+
+# Read CUT&RUN seacr IgG peaks results
+```{r}
+promoter_h3k27ac <- makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_H3K27ac_promoter1kb_deseq_counts_ashr.tsv"),keep.extra.columns = TRUE)
+
+promoter_h3k4me3 <-  makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_H3K4me3_promoter1kb_deseq_counts_ashr.tsv") ,keep.extra.columns = TRUE)
+promoter_rnapolii <-  makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_RNAPolII_promoter1kb_deseq_counts_ashr.tsv"),keep.extra.columns = TRUE)
+
+promoter_igg <-  makeGRangesFromDataFrame(readRDS("../data_output/diffbind_cutnrun/cutnrun_IgG_promoter1kb_deseq_counts_ashr.tsv"),keep.extra.columns = TRUE)
+
+```
+
+
+# Join tables
+
+
+```{r}
+seqlevels(promoters_dm6) <- str_remove(seqlevels(promoters_dm6),"chr")
+colnames(elementMetadata(promoters_dm6)) <- paste0(colnames(elementMetadata(promoters_dm6)),"_rnaseq")
+
+```
+
+```{r}
+cutnrun_results_list <- list("seacrigg_h3k27ac"=seacrigg_h3k27ac,
+        "seacrigg_h3k4me3"=seacrigg_h3k4me3,
+        "seacrigg_rnapolii"=seacrigg_rnapolii,
+        "seacrigg_h3k27acIgG"=seacrigg_h3k27acIgG,
+        "seacrigg_h3k4me3IgG"=seacrigg_h3k4me3IgG,
+        "seacrigg_rnapoliiIgG"=seacrigg_rnapoliiIgG,
+       "promoter_igg"=promoter_igg,
+       "promoter_rnapolii"=promoter_rnapolii,
+       "promoter_h3k4me3"=promoter_h3k4me3,
+       "promoter_h3k27ac"=promoter_h3k27ac)
+
+cutnrun_rna_list <- map(cutnrun_results_list, ~ plyranges::join_overlap_left_within(promoters_dm6, .x))
+
+```
+
+
+# Plots
+
+```{r}
+
+options(scipen = 999)
+as.data.frame(cutnrun_rna_list$seacrigg_h3k27ac) %>%
+    filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("H3K27ac")
+
+as.data.frame(cutnrun_rna_list$seacrigg_h3k4me3) %>%
+    filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("H3K4me3")
+
+as.data.frame(cutnrun_rna_list$seacrigg_rnapolii) %>%
+    filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("RNAPolII") 
+
+```
+
+```{r}
+
+options(scipen = 999)
+as.data.frame(cutnrun_rna_list$seacrigg_h3k27acIgG) %>%
+    filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("H3K27ac")
+
+as.data.frame(cutnrun_rna_list$seacrigg_h3k4me3IgG) %>%
+    filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("H3K4me3")
+
+as.data.frame(cutnrun_rna_list$seacrigg_rnapoliiIgG) %>%
+    filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("RNAPolII") 
+
+```
+```{r}
+options(scipen = 999)
+
+
+as_data_frame(cutnrun_rna_list$promoter_h3k27ac) %>%
+  filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("H3K27ac")
+
+as_data_frame(cutnrun_rna_list$promoter_h3k4me3) %>%
+  filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("H3K4me3")
+
+as_data_frame(cutnrun_rna_list$promoter_igg) %>%
+  filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("IgG")
+
+as_data_frame(cutnrun_rna_list$promoter_rnapolii) %>%
+  filter(padj_rnaseq < 0.05) %>%
+  ggplot(aes(log2FoldChange_rnaseq, log2FoldChange)) +
+  geom_point(size = 0.2) +
+  ggpubr::stat_cor() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("RNAPolII")
+```
+
+
+```{r}
+cutnrun_rnapolii %>%
+  as_data_frame() %>%
+  ggplot(aes(baseMean, log2FoldChange, color = padj < 0.05)) +
+  geom_point() +
+  scale_x_log10() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("RNAPolII")
+
+cutnrun_h3k27ac %>%
+  as_data_frame() %>%
+  ggplot(aes(baseMean, log2FoldChange, color = padj < 0.05)) +
+  geom_point() +
+  scale_x_log10() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("H3K27ac")
+
+cutnrun_h3k4me3 %>%
+  as_data_frame() %>%
+  ggplot(aes(baseMean, log2FoldChange, color = padj < 0.05)) +
+  geom_point() +
+  scale_x_log10() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("H3K4me3")
+
+cutnrun_igg %>%
+  as_data_frame() %>%
+  ggplot(aes(baseMean, log2FoldChange, color = padj < 0.05)) +
+  geom_point() +
+  scale_x_log10() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle("IgG")
+
+```
+
+```{r}
+imap(cutnrun_rna_list, ~ as_data_frame(.x) %>%
+  ggplot(aes(baseMean, log2FoldChange, color = padj < 0.05)) +
+  geom_point() +
+  scale_x_log10() +
+  theme_light() +
+  theme(aspect.ratio = 1) +
+  ggtitle(.y))
+```
+

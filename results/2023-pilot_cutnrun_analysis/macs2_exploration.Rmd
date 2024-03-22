@@ -1,0 +1,64 @@
+---
+title: "filter_macs2_peaks"
+output: html_document
+date: '2023-02-14'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Libraries
+```{r}
+library(tidyverse)
+library(rtracklayer)
+```
+
+# Functions
+
+# Read peaks
+```{r}
+
+peaks <- rtracklayer::import("/Volumes/ExtremePro/Emi/social_experience/cutandrun_dec22/cutandrun_nfrun_dec22/03_peak_calling/04_called_peaks/macs2/H3K27ac_CS_GH_male_brain_R1.macs2_peaks.broadPeak")
+
+```
+
+# Look at distributions
+```{r}
+peaks <- as.data.frame(peaks)
+```
+
+```{r}
+summary(peaks$qValue > 2 & peaks$signalValue > 2)
+
+```
+
+
+```{r}
+peaks %>%
+  mutate(peaks_over_20_cts = score > 20) %>%
+  ggplot(aes(qValue))+
+  geom_histogram(color = "white") +
+  geom_vline(xintercept = 2, color = "red") +
+  facet_grid(rows = vars(peaks_over_20_cts))
+
+peaks %>%
+  mutate(peaks_over_20_cts = score > 20) %>%
+  ggplot(aes(signalValue))+
+  geom_histogram(color = "white") +
+  geom_vline(xintercept = 2, color = "red") +
+  facet_grid(rows = vars(peaks_over_20_cts))
+
+
+peaks %>%
+  ggplot(aes(qValue))+
+  geom_histogram(color = "white") +
+  geom_vline(xintercept = 2, color = "red")
+
+peaks %>%
+  ggplot(aes(signalValue))+
+  geom_histogram(color = "white") +
+  geom_vline(xintercept = 2, color = "red")
+```
+
+Get a strict version of macs2
