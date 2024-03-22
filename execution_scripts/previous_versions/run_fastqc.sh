@@ -11,3 +11,4 @@ fastq=$(awk -v i=$SLURM_ARRAY_TASK_ID 'NR==i' $names_file)
 
 fastqc $fastq
 
+l
