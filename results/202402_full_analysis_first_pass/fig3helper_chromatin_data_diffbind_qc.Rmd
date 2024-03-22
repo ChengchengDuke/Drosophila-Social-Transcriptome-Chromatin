@@ -1,0 +1,468 @@
+---
+title: "fig3helper_chromatin_data_diffbind_qc"
+output: html_document
+date: '2024-01-30'
+---
+# Overview
+
+## Figure 2 Chromatin changes in the central brain between social conditions, and olfactory receptor mutants and transcription factors mutants
+
+## This is a helper notebook for general exploration of statistical parameters from the test
+
+# Libraries
+```{r}
+library(tidyverse)
+library(ComplexHeatmap)
+library(DESeq2)
+```
+
+# Functions
+```{r}
+
+
+```
+
+# Read data
+
+```{r}
+data_dir <- "../data_output/2024-01_diffbind_cutnrun/"
+```
+
+DESeq files
+```{r}
+deseq_files <- list.files(data_dir,pattern = "[^$]+_deseq_obj_fitted.Rds")
+deseq_list <- lapply(paste0(data_dir,deseq_files), readRDS)
+names(deseq_list) <- deseq_files
+```
+
+
+Results joined files
+
+```{r}
+res_df_h3k4me3 <- read_tsv(file = "../data_output/2024-01_diffbind_cutnrun/res_df_h3k4me3_all_join.tsv")
+res_df_h3k27ac <- read_tsv(file = "../data_output/2024-01_diffbind_cutnrun/res_df_h3k27ac_all_join.tsv")
+res_df_rnapolii <- read_tsv(file = "../data_output/2024-01_diffbind_cutnrun/res_df_rnapolii_all_join.tsv")
+
+```
+
+
+# Data re-shaping
+
+Filter by chromatin mark 
+```{r}
+deseq_list_h3k4me3 <- str_detect(names(deseq_list),"H3K4me3")
+deseq_list_h3k27ac <- str_detect(names(deseq_list),"H3K27ac")
+deseq_list_rnapolii <- str_detect(names(deseq_list),"RNAPolII")
+
+```
+
+Clean list names
+```{r}
+names(deseq_list) <- str_remove(names(deseq_list),"cutnrun_")
+```
+
+# Read counts distributions
+
+```{r}
+deseq_housing <- deseq_list[deseq_list_h3k4me3][[2]]
+
+as.data.frame(counts(deseq_housing)) %>%
+  pivot_longer(everything(), names_to = "sample", values_to = "counts") %>%
+  ggplot(aes(log10(counts + 1), sample)) +
+  geom_boxplot()
+```
+
+
+# P value distributions for each test
+
+
+housing
+```{r}
+res_df_h3k27ac %>%
+  select(starts_with("pval")) %>%
+  select(contains("housing")) %>%
+  pivot_longer(cols = everything(), names_to = "comparison", values_to = "pval") %>%
+  ggplot(aes(pval)) +
+  facet_wrap(vars(comparison)) +
+  geom_histogram() +
+  ggtitle("H3K27ac")
+
+res_df_h3k4me3 %>%
+  select(starts_with("pval")) %>%
+    select(contains("housing")) %>%
+  pivot_longer(cols = everything(), names_to = "comparison", values_to = "pval") %>%
+  ggplot(aes(pval)) +
+  facet_wrap(vars(comparison)) +
+  geom_histogram() +
+  ggtitle("H3K4me3")
+
+res_df_rnapolii%>%
+  select(starts_with("pval")) %>%
+    select(contains("housing")) %>%
+  pivot_longer(cols = everything(), names_to = "comparison", values_to = "pval") %>%
+  ggplot(aes(pval)) +
+  facet_wrap(vars(comparison)) +
+  geom_histogram()+
+  ggtitle("RNAPolII")
+
+```
+
+
+genotype
+```{r}
+
+res_df_h3k4me3 %>%
+  select(starts_with("pval")) %>%
+    select(contains("genotype")) %>%
+  pivot_longer(cols = everything(), names_to = "comparison", values_to = "pval") %>%
+  ggplot(aes(pval)) +
+  facet_wrap(vars(comparison)) +
+  geom_histogram() +
+  ggtitle("H3K4me3")
+
+res_df_rnapolii%>%
+  select(starts_with("pval")) %>%
+    select(contains("genotype")) %>%
+  pivot_longer(cols = everything(), names_to = "comparison", values_to = "pval") %>%
+  ggplot(aes(pval)) +
+  facet_wrap(vars(comparison)) +
+  geom_histogram()+
+  ggtitle("RNAPolII")
+
+```
+
+Interaction
+```{r}
+
+res_df_h3k4me3 %>%
+  select(starts_with("pval")) %>%
+    select(contains("interaction")) %>%
+  pivot_longer(cols = everything(), names_to = "comparison", values_to = "pval") %>%
+  ggplot(aes(pval)) +
+  facet_wrap(vars(comparison)) +
+  geom_histogram() +
+  ggtitle("H3K4me3")
+
+res_df_rnapolii%>%
+  select(starts_with("pval")) %>%
+    select(contains("interaction")) %>%
+  pivot_longer(cols = everything(), names_to = "comparison", values_to = "pval") %>%
+  ggplot(aes(pval)) +
+  facet_wrap(vars(comparison)) +
+  geom_histogram()+
+  ggtitle("RNAPolII")
+
+```
+
+# 
+```{r}
+library(fdrtool)
+library(fdrtool)
+
+res_df_h3k27ac_fdrtool <- fdrtool::fdrtool(x =res_df_h3k27ac$stat_H3K27ac_CS_housing_ashr[!is.na(res_df_h3k27ac$padj_H3K27ac_CS_housing_ashr)],plot = TRUE)
+
+res_df_h3k27ac_fdrtool$pval %>%
+  enframe() %>%
+  ggplot(aes(value)) +
+  geom_histogram()
+
+summary(res_df_h3k27ac_fdrtool$qval < 0.05)
+```
+
+# Volcano plot for pairwise comparisons
+
+Housing
+```{r}
+res_df_h3k27ac %>%
+  ggplot(aes(log2FoldChange_H3K27ac_CS_housing_ashr, - 10 * log10(pvalue_H3K27ac_CS_housing_ashr), color = padj_H3K27ac_CS_housing_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k27ac %>%
+  ggplot(aes(x = log10(baseMean_H3K27ac_CS_housing_ashr),log2FoldChange_H3K27ac_CS_housing_ashr, color = padj_H3K27ac_CS_housing_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+```{r}
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_CS_housing_ashr, - 10 * log10(pvalue_H3K4me3_CS_housing_ashr), color = padj_H3K4me3_CS_housing_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_CS_housing_ashr),log2FoldChange_H3K4me3_CS_housing_ashr, color = padj_H3K4me3_CS_housing_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+```{r}
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_dsxmut_housing_ashr, - 10 * log10(pvalue_H3K4me3_dsxmut_housing_ashr), color = padj_H3K4me3_dsxmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_dsxmut_housing_ashr),log2FoldChange_H3K4me3_dsxmut_housing_ashr, color = padj_H3K4me3_dsxmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+```{r}
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_frumut_housing_ashr, - 10 * log10(pvalue_H3K4me3_frumut_housing_ashr), color = padj_H3K4me3_frumut_housing_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_frumut_housing_ashr), log2FoldChange_H3K4me3_frumut_housing_ashr, color = padj_H3K4me3_frumut_housing_ashr < 0.05)) +
+  geom_point(alpha = 0.2, size = 0.2)
+
+```
+
+```{r}
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_Or47bmut_housing_ashr, - 10 * log10(pvalue_H3K4me3_Or47bmut_housing_ashr), color = padj_H3K4me3_Or47bmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_Or47bmut_housing_ashr),log2FoldChange_H3K4me3_Or47bmut_housing_ashr, color = padj_H3K4me3_Or47bmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+
+```{r}
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_Or67dmut_housing_ashr, - 10 * log10(pvalue_H3K4me3_Or67dmut_housing_ashr), color = padj_H3K4me3_Or67dmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_Or67dmut_housing_ashr),log2FoldChange_H3K4me3_Or67dmut_housing_ashr, color = padj_H3K4me3_Or67dmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+```{r}
+
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_frumut_housing_ashr, - 10 * log10(pvalue_RNAPolII_frumut_housing_ashr), color = padj_RNAPolII_frumut_housing_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_frumut_housing_ashr),log2FoldChange_RNAPolII_frumut_housing_ashr, color = padj_RNAPolII_frumut_housing_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+```{r}
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_CS_housing_ashr, - 10 * log10(pvalue_RNAPolII_CS_housing_ashr), color = padj_RNAPolII_CS_housing_ashr < 0.05)) +
+  geom_point() 
+
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_CS_housing_ashr),log2FoldChange_RNAPolII_CS_housing_ashr, color = padj_RNAPolII_CS_housing_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+
+
+```{r}
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_dsxmut_housing_ashr, - 10 * log10(pvalue_RNAPolII_dsxmut_housing_ashr), color = padj_RNAPolII_dsxmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_dsxmut_housing_ashr),log2FoldChange_RNAPolII_dsxmut_housing_ashr, color = padj_RNAPolII_dsxmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+
+```{r}
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_Or47bmut_housing_ashr, - 10 * log10(pvalue_RNAPolII_Or47bmut_housing_ashr), color = padj_RNAPolII_Or47bmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_Or47bmut_housing_ashr),log2FoldChange_RNAPolII_Or47bmut_housing_ashr, color = padj_RNAPolII_Or47bmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+
+```{r}
+
+
+
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_Or67dmut_housing_ashr, - 10 * log10(pvalue_RNAPolII_Or67dmut_housing_ashr), color = padj_RNAPolII_Or67dmut_housing_ashr < 0.05)) +
+  geom_point() 
+
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_Or67dmut_housing_ashr),log2FoldChange_RNAPolII_Or67dmut_housing_ashr, color = padj_RNAPolII_Or67dmut_housing_ashr < 0.05)) +
+  geom_point() 
+```
+
+```{r}
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_dsxmut_GH_genotype_ashr, - 10 * log10(pvalue_RNAPolII_dsxmut_GH_genotype_ashr), color = padj_RNAPolII_dsxmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_dsxmut_SH_genotype_ashr, - 10 * log10(pvalue_RNAPolII_dsxmut_SH_genotype_ashr), color = padj_RNAPolII_dsxmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_dsxmut_GH_genotype_ashr),log2FoldChange_RNAPolII_dsxmut_GH_genotype_ashr, color = padj_RNAPolII_dsxmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_dsxmut_SH_genotype_ashr),log2FoldChange_RNAPolII_dsxmut_SH_genotype_ashr, color = padj_RNAPolII_dsxmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+
+```{r}
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_frumut_GH_genotype_ashr, - 10 * log10(pvalue_RNAPolII_frumut_GH_genotype_ashr), color = padj_RNAPolII_frumut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_frumut_SH_genotype_ashr, - 10 * log10(pvalue_RNAPolII_frumut_SH_genotype_ashr), color = padj_RNAPolII_frumut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_frumut_GH_genotype_ashr),log2FoldChange_RNAPolII_frumut_GH_genotype_ashr, color = padj_RNAPolII_frumut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_frumut_SH_genotype_ashr),log2FoldChange_RNAPolII_frumut_SH_genotype_ashr, color = padj_RNAPolII_frumut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+```{r}
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_Or47bmut_GH_genotype_ashr, - 10 * log10(pvalue_RNAPolII_Or47bmut_GH_genotype_ashr), color = padj_RNAPolII_Or47bmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_Or47bmut_SH_genotype_ashr, - 10 * log10(pvalue_RNAPolII_Or47bmut_SH_genotype_ashr), color = padj_RNAPolII_Or47bmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_Or47bmut_GH_genotype_ashr),log2FoldChange_RNAPolII_Or47bmut_GH_genotype_ashr, color = padj_RNAPolII_Or47bmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_Or47bmut_SH_genotype_ashr),log2FoldChange_RNAPolII_Or47bmut_SH_genotype_ashr, color = padj_RNAPolII_Or47bmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+
+```{r}
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_Or67dmut_GH_genotype_ashr, - 10 * log10(pvalue_RNAPolII_Or67dmut_GH_genotype_ashr), color = padj_RNAPolII_Or67dmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log2FoldChange_RNAPolII_Or67dmut_SH_genotype_ashr, - 10 * log10(pvalue_RNAPolII_Or67dmut_SH_genotype_ashr), color = padj_RNAPolII_Or67dmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_Or67dmut_GH_genotype_ashr),log2FoldChange_RNAPolII_Or67dmut_GH_genotype_ashr, color = padj_RNAPolII_Or67dmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_rnapolii %>%
+  ggplot(aes(log10(baseMean_RNAPolII_Or67dmut_SH_genotype_ashr),log2FoldChange_RNAPolII_Or67dmut_SH_genotype_ashr, color = padj_RNAPolII_Or67dmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+
+```{r}
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_dsxmut_GH_genotype_ashr, - 10 * log10(pvalue_H3K4me3_dsxmut_GH_genotype_ashr), color = padj_H3K4me3_dsxmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_dsxmut_SH_genotype_ashr, - 10 * log10(pvalue_H3K4me3_dsxmut_SH_genotype_ashr), color = padj_H3K4me3_dsxmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_dsxmut_GH_genotype_ashr),log2FoldChange_H3K4me3_dsxmut_GH_genotype_ashr, color = padj_H3K4me3_dsxmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_dsxmut_SH_genotype_ashr),log2FoldChange_H3K4me3_dsxmut_SH_genotype_ashr, color = padj_H3K4me3_dsxmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+
+```{r}
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_frumut_GH_genotype_ashr, - 10 * log10(pvalue_H3K4me3_frumut_GH_genotype_ashr), color = padj_H3K4me3_frumut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_frumut_SH_genotype_ashr, - 10 * log10(pvalue_H3K4me3_frumut_SH_genotype_ashr), color = padj_H3K4me3_frumut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_frumut_GH_genotype_ashr),log2FoldChange_H3K4me3_frumut_GH_genotype_ashr, color = padj_H3K4me3_frumut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_frumut_SH_genotype_ashr),log2FoldChange_H3K4me3_frumut_SH_genotype_ashr, color = padj_H3K4me3_frumut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+```{r}
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_Or47bmut_GH_genotype_ashr, - 10 * log10(pvalue_H3K4me3_Or47bmut_GH_genotype_ashr), color = padj_H3K4me3_Or47bmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_Or47bmut_SH_genotype_ashr, - 10 * log10(pvalue_H3K4me3_Or47bmut_SH_genotype_ashr), color = padj_H3K4me3_Or47bmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_Or47bmut_GH_genotype_ashr),log2FoldChange_H3K4me3_Or47bmut_GH_genotype_ashr, color = padj_H3K4me3_Or47bmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_Or47bmut_SH_genotype_ashr),log2FoldChange_H3K4me3_Or47bmut_SH_genotype_ashr, color = padj_H3K4me3_Or47bmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+```
+
+
+```{r}
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_Or67dmut_GH_genotype_ashr, - 10 * log10(pvalue_H3K4me3_Or67dmut_GH_genotype_ashr), color = padj_H3K4me3_Or67dmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log2FoldChange_H3K4me3_Or67dmut_SH_genotype_ashr, - 10 * log10(pvalue_H3K4me3_Or67dmut_SH_genotype_ashr), color = padj_H3K4me3_Or67dmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_Or67dmut_GH_genotype_ashr),log2FoldChange_H3K4me3_Or67dmut_GH_genotype_ashr, color = padj_H3K4me3_Or67dmut_GH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+res_df_h3k4me3 %>%
+  ggplot(aes(log10(baseMean_H3K4me3_Or67dmut_SH_genotype_ashr),log2FoldChange_H3K4me3_Or67dmut_SH_genotype_ashr, color = padj_H3K4me3_Or67dmut_SH_genotype_ashr < 0.05)) +
+  geom_point() 
+
+```
+
