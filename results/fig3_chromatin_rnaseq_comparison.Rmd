@@ -19,15 +19,11 @@ knitr::opts_chunk$set(
 ```{r}
 # Libraries
 library(tidyverse)
-library(ComplexHeatmap)
-library(DESeq2)
-library(circlize)
 library(ComplexHeatmap) # Heatmaps
 library(DESeq2) 
 library(ggVennDiagram) 
 library(clusterProfiler) # Go terms
 library(org.Dm.eg.db) # GO annotation
-library(tidyverse)
 library(circlize) # Colors
 
 ```
@@ -38,9 +34,10 @@ library(circlize) # Colors
 get_genes_in_set <- function(gene_set, gene_universe) {
   return(map_lgl(gene_universe, ~ .x %in% gene_set))
 }
+
 get_overlap_genes <- function(named_list_gene_sets) {
   # Get all unique genes
-  gene_universe <- na.omit(unique(unlist(named_list_gene_sets)))
+  gene_universe <- na.omit(unique(unlist(named_list_gene_sets))) # Collapse list of vectors into a single vector, get unique genes
   
   named_list_gene_sets <- map(named_list_gene_sets, # For each list:
                               # For each gene:
@@ -133,8 +130,7 @@ res_df <- read_tsv(file = "../data_output/2024-1_diffexpr_output/res_df_all_join
 comp_list <- readRDS( "../data_output/2024-01_diffbind_cutnrun/comp_list.Rds")
 # Lists of differentially expressed genes by comparison 
 comp_list <- c(comp_list,readRDS(file = "../data_output/2024-1_diffexpr_output/comp_list.Rds"))
-comp_list_rna <- readRDS(file = "../data_output/2024-1_diffexpr_output/comp_list.Rds")
-comp_list_rna$
+
 ```
 
 ```{r}
@@ -144,20 +140,37 @@ res_gr_rnapolii_genes <- readRDS( "../data_output/2024-01_diffbind_cutnrun/res_g
 
 ```
 
+```{r}
+# res_long_df
+res_long_df <- readRDS(file = "../data_output/2024-1_diffexpr_output/res_long_df.Rds")
+res_long_df_diff_any <- res_long_df %>%
+  drop_na(padj) %>%
+  filter(padj < 0.05)
+
+```
+
+
+
+```{r}
+# Make lists for venn diagrams 
+
 # Venn diagram with comparisons:
  
 ## GH: all to CS, within the same genotype between RNAseq and CUT&RUN
-```{r}
 
 tr_range2gene <- function(res_id,gr_obj) {
   unique(gr_obj$gene_name[names(gr_obj) %in% res_id])
 }
-# Translate list gh all
+# All genes without considering direction of change
+# Translate list gh all from rangeid to gene name
 comp_list$genotype_gh_all_h3k4me3_geneid <- map(comp_list$genotype_gh_all_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
 comp_list$genotype_gh_all_rnapolii_geneid <- map(comp_list$genotype_gh_all_rnapolii_rangeid,tr_range2gene , gr_obj = res_gr_rnapolii_genes)
 
 # Combine RNA and chromatin lists 
 comp_list$genotype_gh_all_cutnrun_rna_list <- c(comp_list$genotype_gh_all_symbol,comp_list$genotype_gh_all_h3k4me3_geneid, comp_list$genotype_gh_all_rnapolii_geneid)
+
+
+# Genes that go up
 
 # Translate list gh up
 comp_list$genotype_gh_up_h3k4me3_geneid <- map(comp_list$genotype_gh_up_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
@@ -166,12 +179,18 @@ comp_list$genotype_gh_up_rnapolii_geneid <- map(comp_list$genotype_gh_up_rnapoli
 # Combine RNA and chromatin lists 
 comp_list$genotype_gh_up_cutnrun_rna_list <- c(comp_list$genotype_gh_up_symbol,comp_list$genotype_gh_up_h3k4me3_geneid,comp_list$genotype_gh_up_rnapolii_geneid)
 
+# Genes that go DOWN
+
 # Translate list gh down
-comp_list$genotype_gh_down_h3k4me3_geneid <- map(comp_list$genotype_gh_up_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
-comp_list$genotype_gh_down_rnapolii_geneid <- map(comp_list$genotype_gh_up_rnapolii_rangeid,tr_range2gene , gr_obj = res_gr_rnapolii_genes)
+comp_list$genotype_gh_down_h3k4me3_geneid <- map(comp_list$genotype_gh_down_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
+comp_list$genotype_gh_down_rnapolii_geneid <- map(comp_list$genotype_gh_down_rnapolii_rangeid,tr_range2gene , gr_obj = res_gr_rnapolii_genes)
 
 # Combine RNA and chromatin lists 
 comp_list$genotype_gh_down_cutnrun_rna_list <- c(comp_list$genotype_gh_down_symbol,comp_list$genotype_gh_down_h3k4me3_geneid,comp_list$genotype_gh_down_rnapolii_geneid)
+
+# Same but for Single House
+
+# ALL
 
 # Translate list sh all
 comp_list$genotype_sh_all_h3k4me3_geneid <- map(comp_list$genotype_sh_all_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
@@ -179,6 +198,8 @@ comp_list$genotype_sh_all_rnapolii_geneid <- map(comp_list$genotype_sh_all_rnapo
 
 # Combine RNA and chromatin lists 
 comp_list$genotype_sh_all_cutnrun_rna_list <- c(comp_list$genotype_sh_all_symbol,comp_list$genotype_sh_all_h3k4me3_geneid,comp_list$genotype_sh_all_rnapolii_geneid)
+
+# UP
 
 # Translate list sh up
 comp_list$genotype_sh_up_h3k4me3_geneid <- map(comp_list$genotype_sh_up_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
@@ -188,21 +209,78 @@ comp_list$genotype_sh_up_rnapolii_geneid <- map(comp_list$genotype_sh_up_rnapoli
 comp_list$genotype_sh_up_cutnrun_rna_list <- c(comp_list$genotype_sh_up_symbol,comp_list$genotype_sh_up_h3k4me3_geneid,comp_list$genotype_sh_up_rnapolii_geneid)
 
 # Translate list sh down
-comp_list$genotype_sh_down_h3k4me3_geneid <- map(comp_list$genotype_sh_up_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
-comp_list$genotype_sh_down_rnapolii_geneid <- map(comp_list$genotype_sh_up_rnapolii_rangeid,tr_range2gene , gr_obj = res_gr_rnapolii_genes)
+comp_list$genotype_sh_down_h3k4me3_geneid <- map(comp_list$genotype_sh_down_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
+comp_list$genotype_sh_down_rnapolii_geneid <- map(comp_list$genotype_sh_down_rnapolii_rangeid,tr_range2gene , gr_obj = res_gr_rnapolii_genes)
 
 # Combine RNA and chromatin lists 
 comp_list$genotype_sh_down_cutnrun_rna_list <- c(comp_list$genotype_sh_down_symbol,comp_list$genotype_sh_down_h3k4me3_geneid,comp_list$genotype_sh_down_rnapolii_geneid)
+
+# Down
 
 
 # Translate list gh down
-comp_list$genotype_sh_down_h3k4me3_geneid <- map(comp_list$genotype_sh_up_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
-comp_list$genotype_sh_down_rnapolii_geneid <- map(comp_list$genotype_sh_up_rnapolii_rangeid,tr_range2gene , gr_obj = res_gr_rnapolii_genes)
+comp_list$genotype_sh_down_h3k4me3_geneid <- map(comp_list$genotype_sh_down_h3k4me3_rangeid,tr_range2gene , gr_obj = res_gr_h3k4me3_genes)
+comp_list$genotype_sh_down_rnapolii_geneid <- map(comp_list$genotype_sh_down_rnapolii_rangeid,tr_range2gene , gr_obj = res_gr_rnapolii_genes)
 
 # Combine RNA and chromatin lists 
 comp_list$genotype_sh_down_cutnrun_rna_list <- c(comp_list$genotype_sh_down_symbol,comp_list$genotype_sh_down_h3k4me3_geneid,comp_list$genotype_sh_down_rnapolii_geneid)
 
 
+
+```
+
+
+
+```{r}
+## LRT housing by genotype
+
+comp_list$lrt_interaction_gene_name <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"social_mutants_interaction_lrt")) %>%
+  dplyr::select(gene_name, comparison) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list$lrt_interaction_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"social_mutants_interaction_lrt")) %>%
+  dplyr::select(entrezid, comparison) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+
+```
+
+
+```{r}
+## LRT housing 
+
+comp_list$lrt_housing_gene_name <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"social_mutants_housing_lrt")) %>%
+  dplyr::select(gene_name, comparison) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list$lrt_housing_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"social_mutants_housing_lrt")) %>%
+  dplyr::select(entrezid, comparison) %>%
+  split(.$comparison) %>%
+  map("entrezid")
+
+```
+
+
+```{r}
+## LRT genotype 
+
+comp_list$lrt_genotype_gene_name <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"social_mutants_genotype_lrt")) %>%
+  dplyr::select(gene_name, comparison) %>%
+  split(.$comparison) %>%
+  map("gene_name")
+
+comp_list$lrt_genotype_entrezid <- res_long_df_diff_any %>%
+  filter(str_detect(comparison,"social_mutants_genotype_lrt")) %>%
+  dplyr::select(entrezid, comparison) %>%
+  split(.$comparison) %>%
+  map("entrezid")
 
 ```
 
@@ -223,6 +301,9 @@ comp_list$genotype_sh_all_cutnrun_rna_lrt_genotype_list <- c(comp_list$lrt_genot
 ```
 
 
+# Venn diagram with comparisons:
+## GH: all to CS, within the same genotype between RNAseq and CUT&RUN
+
 ### ALL 
 
 ```{r}
@@ -230,8 +311,8 @@ ggVennDiagram::ggVennDiagram(comp_list$genotype_gh_all_cutnrun_rna_list)
 ```
 
 
-
 ```{r}
+# Subset comparisons lists by specific genotype 
 ggVennDiagram::ggVennDiagram(comp_list$genotype_gh_all_cutnrun_rna_list[str_detect(names(comp_list$genotype_gh_all_cutnrun_rna_list),"dsx|DSX")], label_alpha = 0, label = "count", label_color = "white", label_size = 5 ) +
   scale_fill_viridis_c() +
   ggtitle("Mutant vs CantonS GH All") + scale_x_continuous(expand = expansion(mult = .2))
@@ -250,6 +331,7 @@ ggVennDiagram::ggVennDiagram(comp_list$genotype_gh_all_cutnrun_rna_list[str_dete
 ```
 
 Genes 
+
 ```{r}
 get_overlap_genes(comp_list$genotype_gh_all_cutnrun_rna_list[str_detect(names(comp_list$genotype_gh_all_cutnrun_rna_list),"dsx|DSX")]) %>%
   filter(DSX_GH & (H3K4me3_dsxmut | RNAPolII_dsxmut))
@@ -373,6 +455,7 @@ get_overlap_genes(comp_list$genotype_gh_down_cutnrun_rna_list[str_detect(names(c
   filter(Or47b_GH & (H3K4me3_Or47bmut | RNAPolII_Or47bmut))
 
 ```
+
 ## SH: all to a CS, within the same genotype between RNAseq and CUT&RUN
 
 ### ALL 
@@ -643,15 +726,18 @@ comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_dsx_genes %>%
   filter(H3K4me3_dsxmut)
 ```
 
+# GO Terms for genotype LRT terms overlap
+
+Dsx
+
+No enriched go terms for dsx intersection 
 
 ```{r}
 comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_dsx_genes_go <- enrichGO(rownames(comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_dsx_genes),keyType = "SYMBOL", qvalueCutoff = 0.05,OrgDb = org.Dm.eg.db, ont = "ALL")
 
-
 ```
 
-
-
+Fru 
 
 ```{r}
 comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_fru_genes <- get_overlap_genes(comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list[str_detect(names(comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list),"fru|FRU|lrt")]) %>%
@@ -659,7 +745,6 @@ comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_fru_genes <- get_overlap
 
 comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_fru_genes
 ```
-
 
 ```{r}
 comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_fru_genes_go <- enrichGO(rownames(comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_fru_genes),keyType = "SYMBOL", qvalueCutoff = 0.05,OrgDb = org.Dm.eg.db, ont = "ALL")
@@ -704,11 +789,10 @@ comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_67d_genes
 ```{r}
 comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_67d_genes_go <- enrichGO(rownames(comp_list$genotype_gh_all_cutnrun_rna_lrt_genotype_list_67d_genes),keyType = "SYMBOL", qvalueCutoff = 0.05,OrgDb = org.Dm.eg.db, ont = "ALL")
 
-
 ```
 
 
-
+# Single house lrt comparisons 
 
 ```{r}
 ggVennDiagram::ggVennDiagram(comp_list$genotype_sh_all_cutnrun_rna_lrt_genotype_list[str_detect(names(comp_list$genotype_sh_all_cutnrun_rna_lrt_genotype_list),"dsx|DSX|lrt")], label_alpha = 0, label = "count", label_color = "white", label_size = 5 ) +
@@ -807,9 +891,12 @@ comp_list$genotype_sh_all_cutnrun_rna_lrt_genotype_list_67d_genes_go@result
 ```
 
 
-# GO terms of any overlaps above:
+# GO terms of pairwise comparisons overlaps:
 
 ```{r}
+symbol_etrez_map_df <- clusterProfiler::bitr(geneID = res_df$gene_name, fromType = "SYMBOL",toType ="ENTREZID",OrgDb = org.Dm.eg.db )
+symbol_etrez_map <- symbol_etrez_map_df$ENTREZ 
+names(symbol_etrez_map) <-  symbol_etrez_map_df$SYMBOL
 
 comp_list$genotype_gh_all_cutnrun_rna_list_entrezid <- map(comp_list$genotype_gh_all_cutnrun_rna_list, tr_symbol2entrezid, symbol_etrez_map = symbol_etrez_map)
 
@@ -841,6 +928,9 @@ comp_list$genotype_gh_all_cutnrun_rna_list_entrezid_go <- compareCluster(geneClu
 dotplot(comp_list$genotype_gh_all_cutnrun_rna_list_entrezid_go,showCategory = 5, by='GeneRatio') +
   ggtitle("Mutant vs CS GH ALL")
 ```
+```{r}
+comp_list$genotype_gh_all_cutnrun_rna_list_entrezid_go@compareClusterResult
+```
 
 #### UP 
 
@@ -857,6 +947,11 @@ dotplot(comp_list$genotype_gh_up_cutnrun_rna_list_entrezid_go,showCategory = 5, 
   ggtitle("Mutant vs CS GH UP")
 ```
 
+```{r}
+comp_list$genotype_gh_up_cutnrun_rna_list_entrezid_go@compareClusterResult
+```
+
+
 #### Down 
 
 ```{r}
@@ -872,6 +967,9 @@ dotplot(comp_list$genotype_gh_down_cutnrun_rna_list_entrezid_go,showCategory = 5
   ggtitle("Mutant vs CS GH DOWN")
 ```
 
+```{r}
+comp_list$genotype_gh_down_cutnrun_rna_list_entrezid_go@compareClusterResult
+```
 ### SH
 
 #### ALL 
@@ -889,6 +987,11 @@ dotplot(comp_list$genotype_sh_all_cutnrun_rna_list_entrezid_go,showCategory = 5,
   ggtitle("Mutant vs CS SH ALL")
 ```
 
+```{r}
+comp_list$genotype_sh_all_cutnrun_rna_list_entrezid_go@compareClusterResult
+```
+
+
 #### UP 
 
 ```{r}
@@ -902,6 +1005,9 @@ comp_list$genotype_sh_up_cutnrun_rna_list_entrezid_go <- compareCluster(geneClus
 
 dotplot(comp_list$genotype_sh_up_cutnrun_rna_list_entrezid_go,showCategory = 5, by='GeneRatio') +
   ggtitle("Mutant vs CS SH UP")
+```
+```{r}
+comp_list$genotype_sh_up_cutnrun_rna_list_entrezid_go@compareClusterResult
 ```
 
 #### Down 
@@ -920,6 +1026,18 @@ dotplot(comp_list$genotype_sh_down_cutnrun_rna_list_entrezid_go,showCategory = 5
 ```
 
 ```{r}
+comp_list$genotype_sh_down_cutnrun_rna_list_entrezid_go@compareClusterResult
+```
+
+
+# Heatmap summarizing all genes with at least one concordant chromatin/RNAPolII change
+
+This heatmap contains any gene that both:
+
+- Is differentially expressed in the LRT Genotype comparison in RNA-seq. 
+- Overlaps a differential peak in any pairwise genotype comparison
+
+```{r}
 gene_mat <- get_overlap_genes(list("dsx" = rownames(comp_list$genotype_sh_all_cutnrun_rna_lrt_genotype_list_dsx_genes),
 "fru" = rownames(comp_list$genotype_sh_all_cutnrun_rna_lrt_genotype_list_fru_genes),
 "Or67d" = rownames(comp_list$genotype_sh_all_cutnrun_rna_lrt_genotype_list_67d_genes),
@@ -930,18 +1048,111 @@ gene_names_row_mat <- rownames(gene_mat)
 gene_mat <- map_dfc(gene_mat, as.numeric) 
 rownames(gene_mat) <-  gene_names_row_mat 
 
-
 Heatmap(gene_mat %>%
   arrange(Or67d,Or47b),col = c("white","black"), cluster_rows = FALSE,cluster_columns = FALSE ) 
 
 ```
 
+This heatmap contains any gene that:
+- Is differentially expressed in any mutant SH / CantonS SH pairwise comparison in RNA-seq. 
+- Overlaps a differential peak in any mutant SH / CantonS SH pairwise comparison in CUT&RUN.
 
-# Get tables for overlap genes
+Only single house comparison 
+
+```{r}
+genotype_sh_up_cutnrun_rna_list <- comp_list$genotype_sh_up_cutnrun_rna_list
+genotype_sh_down_cutnrun_rna_list <- comp_list$genotype_sh_down_cutnrun_rna_list                      
+
+# ADD direction to sample names
+names(genotype_sh_up_cutnrun_rna_list) <- paste0(names(genotype_sh_up_cutnrun_rna_list), "_UP")
+names(genotype_sh_down_cutnrun_rna_list)<- paste0(names(genotype_sh_down_cutnrun_rna_list), "_DOWN")
+
+
+genotype_sh_overlap_genes <- get_overlap_genes(c(genotype_sh_up_cutnrun_rna_list, genotype_sh_down_cutnrun_rna_list))
+
+# Find genes that show overlap of RNA and CUT&RUN 
+gene_mat <- genotype_sh_overlap_genes %>%
+  filter( (DSX_SH_UP & (H3K4me3_dsxmut_UP | RNAPolII_dsxmut_UP)) |
+            (DSX_SH_DOWN & (H3K4me3_dsxmut_DOWN | RNAPolII_dsxmut_DOWN)) |
+            (FRU_SH_UP & (H3K4me3_frumut_UP | RNAPolII_frumut_UP)) | 
+            (FRU_SH_DOWN & (H3K4me3_frumut_DOWN | RNAPolII_frumut_DOWN)) |
+            (Or47b_SH_UP & (H3K4me3_Or47bmut_UP | RNAPolII_Or47bmut_UP)) | 
+            (Or47b_SH_DOWN & (H3K4me3_Or47bmut_DOWN | RNAPolII_Or47bmut_DOWN)) |
+            (Or67d_SH_UP & (H3K4me3_Or67dmut_UP | RNAPolII_Or67dmut_UP)) | 
+            (Or67d_SH_DOWN & (H3K4me3_Or67dmut_DOWN | RNAPolII_Or67dmut_DOWN)) 
+  )
+
+# Adding back the rownames to matrix
+gene_names_row_mat <- rownames(gene_mat)
+
+# Changing the type of variables 
+gene_mat <- map_dfc(gene_mat, as.numeric) 
+rownames(gene_mat) <-  gene_names_row_mat 
+
+Heatmap( gene_mat,col = c("white","black"),cluster_rows = TRUE,cluster_columns = FALSE )
+```
+
+
+```{r}
+
+overall_go <- compareCluster(geneClusters = list("genes" = symbol_etrez_map[rownames(gene_mat)]),
+                             OrgDb = org.Dm.eg.db,
+                             fun = enrichGO,
+                             qvalueCutoff = 0.05,
+                             readable = TRUE, ont = "ALL")
 
 
 
+dotplot(overall_go,showCategory = Inf, by='GeneRatio') 
 
-# Specific genes of any overlaps above:
-## TPM or normed counts +p
-## GVI view + stats
+cnetplot(overall_go,showCategory = Inf, by='GeneRatio')
+```
+
+```{r}
+overall_go@compareClusterResult
+```
+
+# Only H3K4me3
+
+
+```{r}
+genotype_sh_overlap_genes <- get_overlap_genes(c(genotype_sh_up_cutnrun_rna_list, genotype_sh_down_cutnrun_rna_list))
+gene_mat <- genotype_sh_overlap_genes %>%
+  filter( (DSX_SH_UP & (H3K4me3_dsxmut_UP )) |
+            (DSX_SH_DOWN & (H3K4me3_dsxmut_DOWN )) |
+            (FRU_SH_UP & (H3K4me3_frumut_UP )) | 
+            (FRU_SH_DOWN & (H3K4me3_frumut_DOWN )) |
+            (Or47b_SH_UP & (H3K4me3_Or47bmut_UP )) | 
+            (Or47b_SH_DOWN & (H3K4me3_Or47bmut_DOWN )) |
+            (Or67d_SH_UP & (H3K4me3_Or67dmut_UP )) | 
+            (Or67d_SH_DOWN & (H3K4me3_Or67dmut_DOWN )) 
+  )
+gene_mat <- gene_mat[,!str_detect(colnames(gene_mat),"RNAPolII")]
+
+gene_names_row_mat <- rownames(gene_mat)
+
+gene_mat <- map_dfc(gene_mat, as.numeric) 
+rownames(gene_mat) <-  gene_names_row_mat 
+
+rownames(gene_mat) <- gene_names_row_mat
+Heatmap( gene_mat,col = c("white","black"),cluster_rows = TRUE,cluster_columns = FALSE )
+
+```
+
+```{r}
+
+overall_go <- compareCluster(geneClusters = list("genes" = symbol_etrez_map[rownames(gene_mat)]),
+                             OrgDb = org.Dm.eg.db,
+                             fun = enrichGO,
+                             qvalueCutoff = 0.05,
+                             readable = TRUE, ont = "ALL")
+
+
+
+dotplot(overall_go,showCategory = Inf, by='GeneRatio') 
+
+cnetplot(overall_go,showCategory = Inf, by='GeneRatio')
+```
+
+
+
