@@ -100,7 +100,7 @@ norm_cts_rnapolii_median <- readRDS( "../data_output/2024-01_diffbind_cutnrun/no
 de_genotype <- readRDS( "../data_output/2024-01_diffbind_cutnrun/de_genotype.Rds")
 
 # log2fc matrix
-log2fc_mat_h3k4me3_genotype_gh <- readRDS( "../data_output/2024-01_diffbind_cutnrun/log2fc_mat_h3k4me3_genotype_gh.Rds")
+log2fc_mat_h3k4me3_genotype_gh_gene <- readRDS( "../data_output/2024-01_diffbind_cutnrun/log2fc_mat_h3k4me3_genotype_gh_gene.Rds")
 log2fc_mat_h3k4me3_genotype_sh <- readRDS( "../data_output/2024-01_diffbind_cutnrun/log2fc_mat_h3k4me3_genotype_sh.Rds")
 log2fc_mat_rnapolii_genotype_gh <- readRDS( "../data_output/2024-01_diffbind_cutnrun/log2fc_mat_rnapolii_genotype_gh.Rds")
 log2fc_mat_rnapolii_genotype_sh <- readRDS( "../data_output/2024-01_diffbind_cutnrun/log2fc_mat_rnapolii_genotype_sh.Rds")
@@ -119,6 +119,7 @@ res_gr_rnapolii_genes <- readRDS( "../data_output/2024-01_diffbind_cutnrun/res_g
 comp_list <- readRDS( "../data_output/2024-01_diffbind_cutnrun/comp_list.Rds")
 
 ```
+
 
 ```{r}
 # Read pairwise log2fc matrices for LRT results plots
@@ -139,6 +140,7 @@ log2fc_mat_rnapolii_genotype_sh_gene <- readRDS( "../data_output/2024-01_diffbin
 ```
 
 ```{r}
+# Peaks that are differential in at least one comparison
 diff_ranges <- readRDS( "../data_output/2024-01_diffbind_cutnrun/diff_ranges.Rds")
 ```
 
@@ -161,10 +163,6 @@ dsx_target_genes <- dsx_target_genes$`Male_Fatbody_DamIDseq_Gene_Level_Occupancy
 ```
 
 ```{r}
-comp_list <- readRDS("../data_output/2024-01_diffbind_cutnrun/comp_list.Rds")
-```
-
-```{r}
 # Go terms
 res_gr_rnapolii_genes_go <- readRDS(file = "../data_output/2024-1_diffexpr_output/res_gr_rnapolii_genes_go.Rds")
 res_gr_h3k4me3_genes_go <- readRDS(file = "../data_output/2024-1_diffexpr_output/res_gr_h3k4me3_genes_go.Rds")
@@ -172,9 +170,7 @@ res_gr_h3k4me3_genes_go <- readRDS(file = "../data_output/2024-1_diffexpr_output
 ```
 
 
-# QC of the data: PCA plots 
-
-# PCA
+# QC of the data: PCA plots between samples
 
 ```{r}
 plotPCA(vsd_h3k4me3, intgroup = c("condition")) + 
@@ -191,7 +187,24 @@ plotPCA(vsd_rnapolii, intgroup = c("condition")) +
 
 ```
 
-# LRT
+# Results of ANOVA-like test: Likelihood Ratio Test (LRT)
+
+The likelihood ratio test tells you for each peak, whether there is a significant effect of each term. You can think about it as a two-way anova with two factors:
+
+- Genotype
+- Housing
+
+We can ask three questions:
+
+- Genotype: For each peak, is there an effect of genotype? -> this will give us genes that are differential between genotypes. 
+- Housing: For each peak, is there an effect of housing? -> this will give us genes that are differential between housing. 
+- Genotype:Housing interaction: For each peak, is there a genotype-specific change in housing (for example, differential SH/GH only in CantonS but not in the rest.
+
+Only genotype term was significant, so showing results for that comparison only.
+
+
+## H3K4me3
+
 
 ```{r fig.width=5,fig.height=5}
 sort(table(pairwise_log2fc_h3k4me3_df$sign_paste_genotype_gh)) %>%
@@ -204,9 +217,10 @@ sort(table(pairwise_log2fc_h3k4me3_df$sign_paste_genotype_gh)) %>%
   theme(aspect.ratio = 1) +
   ylab(NULL) +
   xlab("N regions") +
-  ggtitle("Differential H3K4me3 regions")
+  ggtitle("Differential H3K4me3 peaks LRT genotype")
 
 ```
+
 
 ```{r fig.width=6, fig.height=10}
 
@@ -230,7 +244,7 @@ pairwise_log2fc_h3k4me3_df %>%
 
 ```
 
-RNAPolII
+## RNAPolII
 
 ```{r fig.width=5,fig.height=5}
 sort(table(pairwise_log2fc_rnapolii_df$sign_paste_genotype_gh)) %>%
@@ -247,6 +261,7 @@ sort(table(pairwise_log2fc_rnapolii_df$sign_paste_genotype_gh)) %>%
 
 ```
 
+Heatmap 
 
 ```{r fig.width=6,fig.height=10}
 
@@ -270,7 +285,9 @@ pairwise_log2fc_rnapolii_df %>%
 
 ```
 
-# Volcano plots for different comparisons
+# Pairwise tests
+
+## Volcano plots for different comparisons
 
 ## Housing within the same genotype
 
@@ -303,6 +320,8 @@ res_long_rnapolii_df %>%
 ```
 
 ## GH: all to CS
+
+Pairwise mutant GH / CantonS GH 
 
 ```{r}
 
@@ -405,21 +424,26 @@ arrange(gene_name) %>%
 
 # Stats of connection of peaks to genes  
 
+## H3K4me3 Peak annotation 
+
 ```{r}
-library(ChIPseeker)
-library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
+library(ChIPseeker) # Annotation functions for peaks
+library(TxDb.Dmelanogaster.UCSC.dm6.ensGene) # Fly transcripts, promoters annotation
 
+# Changing the names of chromosomes
 res_gr_h3k4me3_genes_uscs <- res_gr_h3k4me3_genes
+seqlevels(res_gr_h3k4me3_genes_uscs) <- paste0("chr",seqlevels(res_gr_h3k4me3_genes_uscs)) # Add "chr" to chromosome names
 
-seqlevels(res_gr_h3k4me3_genes_uscs) <- paste0("chr",seqlevels(res_gr_h3k4me3_genes_uscs))
+# Function to annotate peaks
+res_gr_h3k4me3_anno <- ChIPseeker::annotatePeak(unique(granges(res_gr_h3k4me3_genes_uscs)), # peaks object
+                                                TxDb =TxDb.Dmelanogaster.UCSC.dm6.ensGene) # annotation object
 
-
-res_gr_h3k4me3_anno <- ChIPseeker::annotatePeak(unique(granges(res_gr_h3k4me3_genes_uscs)),TxDb =TxDb.Dmelanogaster.UCSC.dm6.ensGene)
-
-plotAnnoBar(res_gr_h3k4me3_anno)
-plotDistToTSS(res_gr_h3k4me3_anno)
-
+ChIPseeker::plotAnnoBar(res_gr_h3k4me3_anno)
+ChIPseeker::plotDistToTSS(res_gr_h3k4me3_anno)
+ChIPseeker::upsetplot(res_gr_h3k4me3_anno)
 ```
+
+## H3K4me3 Peak annotation GO
 
 ```{r}
 
@@ -427,23 +451,26 @@ res_gr_h3k4me3_genes_mapped_to_genes <- as_data_frame(res_gr_h3k4me3_genes) %>%
   dplyr::select(gene_name, entrez_id, distance, range_id, starts_with("padj")) %>%
   pivot_longer(cols = starts_with("padj"), names_to = "comparison",values_to = "padj") %>%
   filter(padj < 0.05) %>%
-  filter(distance < 2000) %>%
+  filter(distance < 3000) %>% # Distance to TSS filter
   dplyr::select(gene_name, entrez_id,comparison) %>%
   unique()
 
 library(clusterProfiler)
 library(org.Dm.eg.db)
-
+# cluterProfiler for go terms
 res_gr_h3k4me3_genes_mapped_to_genes_go <- clusterProfiler::compareCluster(split(x = res_gr_h3k4me3_genes_mapped_to_genes$entrez_id, res_gr_h3k4me3_genes_mapped_to_genes$comparison), OrgDb = org.Dm.eg.db,qvalueCutoff = 0.05, readable = TRUE)
 
-cnetplot(res_gr_h3k4me3_genes_mapped_to_genes_go,showCategory = Inf)
 
+dotplot(res_gr_h3k4me3_genes_mapped_to_genes_go,showCategory = Inf)
+
+cnetplot(res_gr_h3k4me3_genes_mapped_to_genes_go,showCategory = Inf)
 ```
+
+## RNAPolII Peak annotation 
 
 ```{r}
 
 res_gr_rnapolii_genes_uscs <- res_gr_rnapolii_genes
-
 seqlevels(res_gr_rnapolii_genes_uscs) <- paste0("chr",seqlevels(res_gr_rnapolii_genes_uscs))
 
 
@@ -453,6 +480,7 @@ plotAnnoBar(res_gr_rnapolii_anno)
 plotDistToTSS(res_gr_rnapolii_anno)
 
 ```
+## RNAPolII Peak annotation GO
 
 ```{r}
 
@@ -460,39 +488,32 @@ res_gr_rnapolii_genes_mapped_to_genes <- as_data_frame(res_gr_rnapolii_genes) %>
   dplyr::select(gene_name, entrez_id, distance, range_id, starts_with("padj")) %>%
   pivot_longer(cols = starts_with("padj"), names_to = "comparison",values_to = "padj") %>%
   filter(padj < 0.05) %>%
-  filter(distance < 2000) %>%
+  filter(distance < 3000) %>%
   dplyr::select(gene_name, entrez_id,comparison) %>%
   unique()
 
 res_gr_rnapolii_genes_mapped_to_genes_go <- clusterProfiler::compareCluster(split(x = res_gr_rnapolii_genes_mapped_to_genes$entrez_id, res_gr_rnapolii_genes_mapped_to_genes$comparison), OrgDb = org.Dm.eg.db,qvalueCutoff = 0.05, readable = TRUE)
 
+dotplot(res_gr_rnapolii_genes_mapped_to_genes_go,showCategory = Inf)
+
 cnetplot(res_gr_rnapolii_genes_mapped_to_genes_go,showCategory = Inf)
 
-```
-
-```{r}
-res_gr_h3k4me3_genes %>%
-  as_data_frame() %>%
-  ggplot(aes(distance)) +
-  geom_histogram(bins = 50, color = "white", fill = "navy") +
-  #scale_x_log10()+
-  theme_minimal() +
-  theme(aspect.ratio = 1) +
-  geom_vline(xintercept = 1000, color = "red") +
-  xlim(c(0,50000))
 ```
 
 # Heatmaps:
 
 ### GH vs wt
 
-#### Z score all reps
+#### Per-row Z score matrix showing all replicates
 
 ##### for all DEGs
 
 ```{r fig.height=10}
+get_lgl_from_rownames <- function(row_names, genes_to_subset) {
+  return((str_split(row_names,pattern = "-",n = 2) %>% map_chr(1)) %in% genes_to_subset)
+}
 
-plot_heatmap(norm_cts_h3k4me3_gene[diff_ranges$h3k4me3_gh_genes,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_gene),diff_ranges$h3k4me3_gh_genes),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -505,7 +526,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_gh_genes))
 
 diff_ranges$rnapolii_gh_genes <- diff_ranges$rnapolii_gh_genes[diff_ranges$rnapolii_gh_genes %in% rownames(norm_cts_rnapolii_gene)]
 
-plot_heatmap(norm_cts_rnapolii_gene[diff_ranges$rnapolii_gh_genes,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_gene), diff_ranges$rnapolii_gh_genes),], show_row_names = TRUE, cluster_rows = TRUE) 
 
 
 ```
@@ -516,12 +537,12 @@ Get the genes underlying this heatmap:
 print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_gh_genes))
 ```
 
-##### fru targets
+##### fru: differential peaks subset by whether they are fru targets
 
 ```{r}
 diff_ranges$h3k4me3_gh_genes_fru <- diff_ranges$h3k4me3_gh_genes[diff_ranges$h3k4me3_gh_genes %in% fru_target_genes]
 
-plot_heatmap(norm_cts_h3k4me3_gene[diff_ranges$h3k4me3_gh_genes_fru,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_gene),diff_ranges$h3k4me3_gh_genes_fru),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -534,7 +555,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_gh_genes_fru))
 diff_ranges$rnapolii_gh_genes_fru <- diff_ranges$rnapolii_gh_genes[diff_ranges$rnapolii_gh_genes %in% fru_target_genes]
 
 
-plot_heatmap(norm_cts_rnapolii_gene[diff_ranges$rnapolii_gh_genes_fru,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_gene),diff_ranges$rnapolii_gh_genes_fru),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -543,12 +564,12 @@ Get the genes underlying this heatmap:
 print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_gh_genes_fru))
 ```
 
-##### dsx targets
+##### dsx: differential peaks subset by whether they are dsx targets
 
 ```{r}
 diff_ranges$h3k4me3_gh_genes_dsx <- diff_ranges$h3k4me3_gh_genes[diff_ranges$h3k4me3_gh_genes %in% dsx_target_genes]
 
-plot_heatmap(norm_cts_h3k4me3_gene[diff_ranges$h3k4me3_gh_genes_dsx,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_gene),diff_ranges$h3k4me3_gh_genes_dsx),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -561,7 +582,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_gh_genes_dsx))
 ```{r}
 diff_ranges$rnapolii_gh_genes_dsx <- diff_ranges$rnapolii_gh_genes[diff_ranges$rnapolii_gh_genes %in% dsx_target_genes]
 
-plot_heatmap(norm_cts_rnapolii_gene[diff_ranges$rnapolii_gh_genes_dsx,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_gene),diff_ranges$rnapolii_gh_genes_dsx),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -579,7 +600,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_gh_genes_dsx))
 H3K4me3
 
 ```{r fig.height=10}
-plot_heatmap(norm_cts_h3k4me3_median_gene[diff_ranges$h3k4me3_gh_genes,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_median_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_median_gene),diff_ranges$h3k4me3_gh_genes),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -591,7 +612,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_gh_genes))
 RNAPolII 
 
 ```{r fig.height=10}
-plot_heatmap(norm_cts_rnapolii_median_gene[diff_ranges$rnapolii_gh_genes,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_median_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_median_gene),diff_ranges$rnapolii_gh_genes),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -605,7 +626,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_gh_genes))
 H3K4me3 
 
 ```{r}
-plot_heatmap(norm_cts_h3k4me3_median_gene[diff_ranges$h3k4me3_gh_genes_fru,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_median_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_median_gene),diff_ranges$h3k4me3_gh_genes_fru),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -617,7 +638,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_gh_genes_fru))
 RNAPolII
 
 ```{r}
-plot_heatmap(norm_cts_rnapolii_median_gene[diff_ranges$rnapolii_gh_genes_fru,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_median_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_median_gene),diff_ranges$rnapolii_gh_genes_fru),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -631,7 +652,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_gh_genes_fru))
 H3K4me3
 
 ```{r}
-plot_heatmap(norm_cts_h3k4me3_median_gene[diff_ranges$h3k4me3_gh_genes_dsx,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_median_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_median_gene),diff_ranges$h3k4me3_gh_genes_dsx),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -643,7 +664,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_gh_genes_dsx))
 RNAPolII
 
 ```{r}
-plot_heatmap(norm_cts_rnapolii_median_gene[diff_ranges$rnapolii_gh_genes_dsx,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_median_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_median_gene),diff_ranges$rnapolii_gh_genes_dsx),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -659,7 +680,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_gh_genes_dsx))
 ##### for all DEGs
 
 ```{r fig.height=10}
-plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_gh,
+plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_gh_gene,
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -668,11 +689,11 @@ plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_gh,
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_gh)))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_gh_gene)))
 ```
 
 ```{r fig.height=10}
-plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_gh,
+plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_gh_gene,
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -682,13 +703,13 @@ plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_gh,
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_gh)))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_gh_gene)))
 ```
 
 ##### fru targets
 
 ```{r}
-plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_gh[rownames(log2fc_mat_h3k4me3_genotype_gh) %in% fru_target_genes,],
+plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_gh_gene[get_lgl_from_rownames(rownames(log2fc_mat_h3k4me3_genotype_gh_gene),fru_target_genes),],
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -698,13 +719,13 @@ plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_gh[rownames(log2fc_mat_h3k4me3_g
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_gh[rownames(log2fc_mat_h3k4me3_genotype_gh) %in% fru_target_genes,])))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_gh_gene[get_lgl_from_rownames(rownames(log2fc_mat_h3k4me3_genotype_gh_gene), fru_target_genes),])))
 ```
 
 RNAPolII
 
 ```{r}
-plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_gh[rownames(log2fc_mat_rnapolii_genotype_gh) %in% fru_target_genes,],
+plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_gh_gene[get_lgl_from_rownames(rownames(log2fc_mat_rnapolii_genotype_gh_gene),fru_target_genes),],
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -714,7 +735,7 @@ plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_gh[rownames(log2fc_mat_rnapolii
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_gh[rownames(log2fc_mat_rnapolii_genotype_gh) %in% fru_target_genes,])))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_gh_gene[get_lgl_from_rownames(rownames(log2fc_mat_rnapolii_genotype_gh_gene) ,fru_target_genes),])))
 ```
 
 ##### dsx targets
@@ -722,7 +743,7 @@ print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotyp
 H3K4me3
 
 ```{r}
-plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_gh[rownames(log2fc_mat_h3k4me3_genotype_gh) %in% dsx_target_genes,],
+plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_gh_gene[get_lgl_from_rownames(rownames(log2fc_mat_h3k4me3_genotype_gh_gene) ,dsx_target_genes),],
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -733,14 +754,14 @@ plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_gh[rownames(log2fc_mat_h3k4me3_g
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_gh[rownames(log2fc_mat_h3k4me3_genotype_gh) %in% dsx_target_genes,])))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_gh_gene[get_lgl_from_rownames(rownames(log2fc_mat_h3k4me3_genotype_gh_gene) , dsx_target_genes),])))
 ```
 
 
 RNAPolII
 
 ```{r}
-plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_gh[rownames(log2fc_mat_rnapolii_genotype_gh) %in% dsx_target_genes,],
+plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_gh_gene[get_lgl_from_rownames(rownames(log2fc_mat_rnapolii_genotype_gh_gene), dsx_target_genes),],
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -750,7 +771,7 @@ plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_gh[rownames(log2fc_mat_rnapolii
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_gh[rownames(log2fc_mat_rnapolii_genotype_gh) %in% dsx_target_genes,])))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_gh_gene[get_lgl_from_rownames(rownames(log2fc_mat_rnapolii_genotype_gh_gene), dsx_target_genes),])))
 ```
 
 
@@ -766,7 +787,8 @@ H3K4me3
 
 ```{r fig.height=10}
 
-plot_heatmap(norm_cts_h3k4me3_gene[diff_ranges$h3k4me3_sh_genes,], show_row_names = TRUE, cluster_rows = TRUE) 
+
+plot_heatmap(norm_cts_h3k4me3_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_gene),diff_ranges$h3k4me3_sh_genes),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -781,7 +803,7 @@ RNAPolII
 
 diff_ranges$rnapolii_sh_genes <- diff_ranges$rnapolii_sh_genes[diff_ranges$rnapolii_sh_genes %in% rownames(norm_cts_rnapolii)]
 
-plot_heatmap(norm_cts_rnapolii_gene[diff_ranges$rnapolii_sh_genes,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_gene),diff_ranges$rnapolii_sh_genes),], show_row_names = TRUE, cluster_rows = TRUE) 
 
 
 ```
@@ -797,7 +819,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_sh_genes))
 ```{r}
 diff_ranges$h3k4me3_sh_genes_fru <- diff_ranges$h3k4me3_sh_genes[diff_ranges$h3k4me3_sh_genes %in% fru_target_genes]
 
-plot_heatmap(norm_cts_h3k4me3_gene[diff_ranges$h3k4me3_sh_genes_fru,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_gene),diff_ranges$h3k4me3_sh_genes_fru),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -810,7 +832,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_sh_genes_fru))
 diff_ranges$rnapolii_sh_genes_fru <- diff_ranges$rnapolii_sh_genes[diff_ranges$rnapolii_sh_genes %in% fru_target_genes]
 
 
-plot_heatmap(norm_cts_rnapolii_gene[diff_ranges$rnapolii_sh_genes_fru,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_gene),diff_ranges$rnapolii_sh_genes_fru),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -824,7 +846,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_sh_genes_fru))
 ```{r}
 diff_ranges$h3k4me3_sh_genes_dsx <- diff_ranges$h3k4me3_sh_genes[diff_ranges$h3k4me3_sh_genes %in% dsx_target_genes]
 
-plot_heatmap(norm_cts_h3k4me3_gene[diff_ranges$h3k4me3_sh_genes_dsx,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_gene), diff_ranges$h3k4me3_sh_genes_dsx),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -837,7 +859,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_sh_genes_dsx))
 ```{r}
 diff_ranges$rnapolii_sh_genes_dsx <- diff_ranges$rnapolii_sh_genes[diff_ranges$rnapolii_sh_genes %in% dsx_target_genes]
 
-plot_heatmap(norm_cts_rnapolii[diff_ranges$rnapolii_sh_genes_dsx,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii[get_lgl_from_rownames(rownames(norm_cts_rnapolii),diff_ranges$rnapolii_sh_genes_dsx),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -855,7 +877,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_sh_genes_dsx))
 H3K4me3
 
 ```{r fig.height=10}
-plot_heatmap(norm_cts_h3k4me3_median_gene[diff_ranges$h3k4me3_sh_genes,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_median_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_median_gene),diff_ranges$h3k4me3_sh_genes),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -867,7 +889,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_sh_genes))
 RNAPolII 
 
 ```{r fig.height=10}
-plot_heatmap(norm_cts_rnapolii_median_gene[diff_ranges$rnapolii_sh_genes,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_median_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_median_gene),diff_ranges$rnapolii_sh_genes),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -881,7 +903,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_sh_genes))
 H3K4me3 
 
 ```{r}
-plot_heatmap(norm_cts_h3k4me3_gene[diff_ranges$h3k4me3_sh_genes_fru,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_gene),diff_ranges$h3k4me3_sh_genes_fru),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -893,7 +915,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_sh_genes_fru))
 RNAPolII
 
 ```{r}
-plot_heatmap(norm_cts_rnapolii_median_gene[diff_ranges$rnapolii_sh_genes_fru,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_median_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_median_gene),diff_ranges$rnapolii_sh_genes_fru),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -907,7 +929,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_sh_genes_fru))
 H3K4me3
 
 ```{r}
-plot_heatmap(norm_cts_h3k4me3_gene[diff_ranges$h3k4me3_sh_genes_dsx,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_h3k4me3_gene[get_lgl_from_rownames(rownames(norm_cts_h3k4me3_gene),diff_ranges$h3k4me3_sh_genes_dsx),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -919,7 +941,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$h3k4me3_sh_genes_dsx))
 RNAPolII
 
 ```{r}
-plot_heatmap(norm_cts_rnapolii_median_gene[diff_ranges$rnapolii_sh_genes_dsx,], show_row_names = TRUE, cluster_rows = TRUE) 
+plot_heatmap(norm_cts_rnapolii_median_gene[get_lgl_from_rownames(rownames(norm_cts_rnapolii_median_gene),diff_ranges$rnapolii_sh_genes_dsx),], show_row_names = TRUE, cluster_rows = TRUE) 
 ```
 
 Get the genes underlying this heatmap:
@@ -935,7 +957,7 @@ print_exportable_genes(data.frame("genes" = diff_ranges$rnapolii_sh_genes_dsx))
 ##### for all DEGs
 
 ```{r fig.height=10}
-plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_sh,
+plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_sh_gene,
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -944,11 +966,11 @@ plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_sh,
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_sh)))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_sh_gene)))
 ```
 
 ```{r fig.height=10}
-plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_sh,
+plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_sh_gene,
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -958,13 +980,13 @@ plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_sh,
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_sh)))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_sh_gene)))
 ```
 
 ##### fru targets
 
 ```{r}
-plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_sh[rownames(log2fc_mat_h3k4me3_genotype_sh) %in% fru_target_genes,],
+plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_sh[get_lgl_from_rownames(rownames(log2fc_mat_h3k4me3_genotype_sh_gene) , fru_target_genes),],
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -974,13 +996,13 @@ plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_sh[rownames(log2fc_mat_h3k4me3_g
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_sh[rownames(log2fc_mat_h3k4me3_genotype_sh) %in% fru_target_genes,])))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_sh_gene[get_lgl_from_rownames(rownames(log2fc_mat_h3k4me3_genotype_sh_gene), fru_target_genes),])))
 ```
 
 RNAPolII
 
 ```{r}
-plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_sh[rownames(log2fc_mat_rnapolii_genotype_sh) %in% fru_target_genes,],
+plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_sh_gene[get_lgl_from_rownames(rownames(log2fc_mat_rnapolii_genotype_sh_gene), fru_target_genes),],
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -990,7 +1012,7 @@ plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_sh[rownames(log2fc_mat_rnapolii
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_sh[rownames(log2fc_mat_rnapolii_genotype_sh) %in% fru_target_genes,])))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_sh_gene[get_lgl_from_rownames(rownames(log2fc_mat_rnapolii_genotype_sh_gene), fru_target_genes),])))
 ```
 
 ##### dsx targets
@@ -998,7 +1020,7 @@ print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotyp
 H3K4me3
 
 ```{r}
-plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_sh[rownames(log2fc_mat_h3k4me3_genotype_sh) %in% dsx_target_genes,],
+plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_sh_gene[get_lgl_from_rownames(rownames(log2fc_mat_h3k4me3_genotype_sh_gene), dsx_target_genes),],
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -1009,14 +1031,14 @@ plot_heatmap_log2fc(log2fc_mat_h3k4me3_genotype_sh[rownames(log2fc_mat_h3k4me3_g
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_sh[rownames(log2fc_mat_h3k4me3_genotype_sh) %in% dsx_target_genes,])))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_h3k4me3_genotype_sh_gene[get_lgl_from_rownames(rownames(log2fc_mat_h3k4me3_genotype_sh_gene), dsx_target_genes),])))
 ```
 
 
 RNAPolII
 
 ```{r}
-plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_sh[rownames(log2fc_mat_rnapolii_genotype_sh) %in% dsx_target_genes,],
+plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_sh_gene[get_lgl_from_rownames(rownames(log2fc_mat_rnapolii_genotype_sh_gene), dsx_target_genes),],
                     cluster_rows = TRUE,
                     col = colorRamp2(breaks = c(-4,0,4),
                                      colors = c("blue","white","red")),
@@ -1026,7 +1048,7 @@ plot_heatmap_log2fc(log2fc_mat_rnapolii_genotype_sh[rownames(log2fc_mat_rnapolii
 Get the genes underlying this heatmap:
 
 ```{r}
-print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_sh[rownames(log2fc_mat_rnapolii_genotype_sh) %in% dsx_target_genes,])))
+print_exportable_genes(data.frame("genes" = rownames(log2fc_mat_rnapolii_genotype_sh_gene[get_lgl_from_rownames(rownames(log2fc_mat_rnapolii_genotype_sh_gene), dsx_target_genes),])))
 ```
 
 
@@ -1122,7 +1144,7 @@ ggVennDiagram::ggVennDiagram(comp_list$genotype_sh_down_rnapolii_rangeid, label_
   ggtitle("Mutant vs CantonS SH DOWN RNAPolII") + scale_x_continuous(expand = expansion(mult = .2))
 ```
 
-# GO terms for different comparisons
+# GO terms for different comparisons, distance-based gene to peak connections
 
 ```{r}
 dotplot(res_gr_h3k4me3_genes_go,showCategory = Inf, by='GeneRatio') +
@@ -1130,7 +1152,7 @@ dotplot(res_gr_h3k4me3_genes_go,showCategory = Inf, by='GeneRatio') +
 ```
 
 ```{r}
-cnetplot(clusterProfiler::simplify( res_gr_h3k4me3_genes_go),showCategory = Inf, by='GeneRatio') +
+cnetplot( res_gr_h3k4me3_genes_go,showCategory = Inf, by='GeneRatio') +
   ggtitle("GO terms H3K4me3")
 
 ```
@@ -1143,9 +1165,7 @@ DT::datatable(res_gr_h3k4me3_genes_go@compareClusterResult,extensions = 'Buttons
 ```
 
 
-
 ```{r}
-
 dotplot(res_gr_rnapolii_genes_go,showCategory = Inf, by='GeneRatio') +
   ggtitle("GO terms RNAPolII")
 ```
