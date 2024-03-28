@@ -20,7 +20,10 @@ deseq_obj_file <- inputs[3]
 
 # Load deseq obj
 deseq_obj <- readRDS(deseq_obj_file)
-colnames(deseq_obj) <- str_remove(basename(colData(deseq_obj)$bam.files),".target.dedup.sorted.bam")
+
+# Changing the names of the samples
+colnames(deseq_obj) <- str_remove(basename(colData(deseq_obj)$bam.files),".target.dedup.sorted.bam") # Remove bam file information
+# Set experimental variables
 colData(deseq_obj)$housing <- as.factor(str_split(colnames(deseq_obj),pattern = "_",n = 6) %>% map_chr(3))
 colData(deseq_obj)$genotype <- as.factor(str_split(colnames(deseq_obj),pattern = "_",n = 6) %>% map_chr(2))
 colData(deseq_obj)$condition <- as.factor(paste0(colData(deseq_obj)$genotype, "_",colData(deseq_obj)$housing))
@@ -87,7 +90,7 @@ iwalk(res_ashr_gr_df_list, ~ write_tsv(.x, .y))
 # Write deseq fitted objects
 saveRDS(object = deseq_obj, paste0(out_dir,res_names,"_deseq_obj_housing_fitted.Rds"))
 
-# DiffBind bedfiles
+# DiffBind bedfiles 
 names(res_up_list) <- str_replace(names(res_ashr_list),".Rds","_up.bed")
 iwalk(res_up_list, ~ rtracklayer::export.bed(.x,.y))
 

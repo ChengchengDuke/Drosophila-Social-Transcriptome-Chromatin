@@ -3,7 +3,7 @@
 ######
 
 library(tidyverse)
-library(GenomicRanges)
+library(GenomicRanges) # Reperesent ranges in R 
 library(plyranges)
 library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
 library(org.Dm.eg.db)
@@ -39,19 +39,22 @@ get_median_per_group <- function(norm_cts) {
   return(norm_cts_median)
 }
 
+
 # Filter and Rename matrices: convert from peak-based matrices to 
 rownames_filt_and_convert_to_gene <- function(mat,gene_map) {
   # Filter and Rename mats
   # Keep only rows that exist in gene map
   mat <- mat[rownames(mat) %in% names(gene_map),]
-  # Change rownames from id to gene name
-  rownames(mat) <- gene_map[rownames(mat)]
+  # Append rownames from id to gene name
+  rownames(mat) <- paste0(gene_map[rownames(mat)],"-",rownames(mat))
   # Remove rows that failed to map
-  mat <- mat[!is.na(rownames(mat)),]
+  mat <- mat[!str_detect(rownames(mat),"NA"),]
   # Remove duplicated rows
   mat <- mat[!duplicated(rownames(mat)),]
   return(mat)
 }
+
+
 ######
 ### Read data
 ######
@@ -262,11 +265,12 @@ saveRDS(log2fc_mat_rnapolii_genotype_sh, "data_output/2024-01_diffbind_cutnrun/l
 # Connect to genes
 ######
 
-# Make ranges for both peaks objects
+# Make Granges objects for both peaks objects, dataframe need seqnames, start, end
 res_gr_h3k4me3 <- makeGRangesFromDataFrame( res_df_h3k4me3,keep.extra.columns = TRUE)
 res_gr_rnapolii <- makeGRangesFromDataFrame( res_df_rnapolii,keep.extra.columns = TRUE)
 
-# Get promoters info
+# Get promoters info in a GRanges object
+# promoter function 
 promoters_dm6 <- promoters(TxDb.Dmelanogaster.UCSC.dm6.ensGene, columns = "gene_id",upstream=0,downstream=1)
 seqlevels(promoters_dm6) <- str_remove(seqlevels(promoters_dm6),"chr")
 
@@ -285,6 +289,7 @@ promoters_dm6$entrez_id <- promoter_map_entrez[unlist(promoters_dm6$gene_id)]
 # Join H3K4me3 peaks and promoters data by the nearest TSS (keep distance info)
 res_gr_h3k4me3_genes <- plyranges::join_nearest_left(x = res_gr_h3k4me3,y = promoters_dm6, distance = TRUE) 
 
+# Making an id column for each peak merging their genome coordinate info 
 res_gr_h3k4me3_genes$range_id <- as.data.frame(granges(res_gr_h3k4me3_genes)) %>%
   mutate(range_id = paste0(seqnames,":",start,"-",end)) %>%
   pull(range_id)
@@ -431,6 +436,8 @@ names(gene_map_rnapolii) <- res_gr_rnapolii_genes$range_id
 
 # Filter matrices and rename to have them gene-based instead of peak-based 
 norm_cts_h3k4me3_gene <- rownames_filt_and_convert_to_gene(norm_cts_h3k4me3,gene_map_h3k4me3)
+
+
 norm_cts_h3k4me3_median_gene <- rownames_filt_and_convert_to_gene(norm_cts_h3k4me3_median,gene_map_h3k4me3)
 norm_cts_rnapolii_gene <- rownames_filt_and_convert_to_gene(norm_cts_rnapolii,gene_map_rnapolii)
 norm_cts_rnapolii_median_gene <- rownames_filt_and_convert_to_gene(norm_cts_rnapolii_median,gene_map_rnapolii)
@@ -601,8 +608,8 @@ pairwise_log2fc_h3k4me3_df <- res_df_h3k4me3 %>%
 # Create a matrix with only fold change 
 pairwise_log2fc_h3k4me3_mat <- pairwise_log2fc_h3k4me3_df %>%
   select(starts_with("log2FoldChange"))
-# Make a logical filterl
-logfc_filter <- rowSums(abs(pairwise_log2fc_h3k4me3_mat) > 1) >= 1
+# Make a logical filter: at least one pairwise log2fc is larger than 1
+logfc_filter <- rowSums(abs(pairwise_log2fc_h3k4me3_mat) > 0) >= 1
 
 # Filter out the dataframe
 pairwise_log2fc_h3k4me3_df <- pairwise_log2fc_h3k4me3_df %>%
@@ -635,7 +642,7 @@ pairwise_log2fc_rnapolii_df <- res_df_rnapolii %>%
 pairwise_log2fc_rnapolii_mat <- pairwise_log2fc_rnapolii_df %>%
   select(starts_with("log2FoldChange"))
 # Make a logical filterl
-logfc_filter <- rowSums(abs(pairwise_log2fc_rnapolii_mat) > 1) >= 1
+logfc_filter <- rowSums(abs(pairwise_log2fc_rnapolii_mat) > 0) >= 1
 
 # Filter out the dataframe
 pairwise_log2fc_rnapolii_df <- pairwise_log2fc_rnapolii_df %>%

@@ -19,7 +19,7 @@ find_common_ranges <- function(res_list){
 # Change names of columns, and left_join recursively 
 reshape_res_list_to_df <- function(res_list) {
   res_df <- find_common_ranges(res_list)
-  res_df <- reduce(c(list(res_df),imap(res_list, rename_cols_after3)),left_join, by = c("seqnames","start","end"))
+  res_df <- purrr::reduce(c(list(res_df),imap(res_list, rename_cols_after3)),left_join, by = c("seqnames","start","end"))
   return(res_df)
 }
 
