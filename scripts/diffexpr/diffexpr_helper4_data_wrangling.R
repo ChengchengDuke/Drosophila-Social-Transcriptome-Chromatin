@@ -218,6 +218,24 @@ comp_list$genotype_sh_down_entrezid <- res_long_df_diff_any %>%
   split(.$comparison) %>%
   map("entrezid")
 
+# Define the desired order (prefixes)
+desired_order <- c("CS", "Or47b", "Or67d", "FRU", "DSX")
+
+# Apply function to each sublist within the big list
+comp_list <- lapply(comp_list, function(sublist) {
+  # Ensure we match elements that start with the desired order using grep
+  ordered_names <- unlist(lapply(desired_order, function(pattern) {
+    grep(paste0("^", pattern), names(sublist), value = TRUE)
+  }))
+  
+  # Reorder the sublist
+  sublist <- sublist[ordered_names]
+  
+  # Return the reordered sublist while keeping original names
+  return(sublist)
+})
+
+
 ############
 # Data transform for heatmaps
 ############
@@ -245,6 +263,38 @@ de$genotype_gh_genes_id <- res_long_df %>%
 de$genotype_sh_genes_id <- res_long_df %>%
   dplyr::select(gene_name, comparison, padj, log2FoldChange) %>%
   filter(str_detect(comparison, "SH_genotype")) %>%
+  filter(padj < 0.05 & abs(log2FoldChange) > 0.1) %>%
+  pull(gene_name) %>%
+  unique()
+
+de$genotype_Or_gh_genes_id <- res_long_df %>%
+  dplyr::select(gene_name, comparison, padj, log2FoldChange) %>%
+  filter(str_detect(comparison, "GH_genotype")) %>%
+  filter(str_detect(comparison, "Or47b|Or67d")) %>%
+  filter(padj < 0.05 & abs(log2FoldChange) > 0.1) %>%
+  pull(gene_name) %>%
+  unique()
+
+de$genotype_Or_sh_genes_id <- res_long_df %>%
+  dplyr::select(gene_name, comparison, padj, log2FoldChange) %>%
+  filter(str_detect(comparison, "SH_genotype")) %>%
+  filter(str_detect(comparison, "Or47b|Or67d")) %>%
+  filter(padj < 0.05 & abs(log2FoldChange) > 0.1) %>%
+  pull(gene_name) %>%
+  unique()
+
+de$genotype_TF_gh_genes_id <- res_long_df %>%
+  dplyr::select(gene_name, comparison, padj, log2FoldChange) %>%
+  filter(str_detect(comparison, "GH_genotype")) %>%
+  filter(str_detect(comparison, "FRU|DSX")) %>%
+  filter(padj < 0.05 & abs(log2FoldChange) > 0.1) %>%
+  pull(gene_name) %>%
+  unique()
+
+de$genotype_TF_sh_genes_id <- res_long_df %>%
+  dplyr::select(gene_name, comparison, padj, log2FoldChange) %>%
+  filter(str_detect(comparison, "SH_genotype")) %>%
+  filter(str_detect(comparison, "FRU|DSX")) %>%
   filter(padj < 0.05 & abs(log2FoldChange) > 0.1) %>%
   pull(gene_name) %>%
   unique()
@@ -310,6 +360,79 @@ colnames(log2fc_mat_genotype_gh) <- str_remove(colnames(log2fc_mat_genotype_gh) 
 
 colnames(log2fc_mat_genotype_sh) <- str_remove(colnames(log2fc_mat_genotype_sh) ,"log2FoldChange_")
 colnames(log2fc_mat_genotype_sh) <- str_remove(colnames(log2fc_mat_genotype_sh) ,"_genotype")
+
+
+
+##########
+# significant ashr genotype GH regions
+##########
+
+# Filter results dataframe to get significant ashr genotype regions
+# Select relevant columns for pairwise LogFC
+pairwise_log2fc_genotype_df_ashr_GH <- res_df %>%
+  dplyr::filter(padj_DSX_GH_genotype < 0.05 | padj_FRU_GH_genotype < 0.05 | padj_Or47b_GH_genotype < 0.05 | padj_Or67d_GH_genotype < 0.05) %>% # get diff genes by ashr genotype 
+  dplyr::select(gene_name, entrezid,sign_paste_genotype_gh,starts_with("log2FoldChange")) %>% # selecting relevant columns
+  dplyr::select(!contains("lrt")) %>% # REmove lrt columns
+  dplyr::select(!contains("housing")) %>% # remove housing pairwise comparison 
+  dplyr::select(!contains("_SH_")) # remove SH columns 
+
+# Filter by absolute Fold change
+# Create a matrix with only fold change 
+pairwise_log2fc_genotype_mat <- pairwise_log2fc_genotype_df_ashr_GH %>%
+  dplyr::select(starts_with("log2FoldChange"))
+# Make a logical filterl
+logfc_genotype_filter <- rowSums(abs(pairwise_log2fc_genotype_mat) > 0.1) >= 1
+
+# Filter out the dataframe
+pairwise_log2fc_genotype_df_ashr_GH <- pairwise_log2fc_genotype_df_ashr_GH %>%
+  dplyr::filter(logfc_genotype_filter)
+
+# Change the column names for the data.frame to keep only relevant info 
+colnames(pairwise_log2fc_genotype_df_ashr_GH) <- str_remove(colnames(pairwise_log2fc_genotype_df_ashr_GH), "log2FoldChange_")
+colnames(pairwise_log2fc_genotype_df_ashr_GH) <- str_remove(colnames(pairwise_log2fc_genotype_df_ashr_GH), "_GH_genotype")
+
+# Change log2fc columns to a single log2c column for compatibility with ggplot2
+pairwise_log2fc_genotype_df_ashr_GH <- pairwise_log2fc_genotype_df_ashr_GH %>%
+  pivot_longer(cols = - c(gene_name,entrezid,sign_paste_genotype_gh), names_to = "genotype",values_to = "log2FoldChange")
+
+
+
+
+
+##########
+# significant ashr genotype SH regions
+##########
+
+# Filter results dataframe to get significant ashr genotype regions
+# Select relevant columns for pairwise LogFC
+pairwise_log2fc_genotype_df_ashr_SH <- res_df %>%
+  dplyr::filter(padj_DSX_SH_genotype < 0.05 | padj_FRU_SH_genotype < 0.05 | padj_Or47b_SH_genotype < 0.05 | padj_Or67d_SH_genotype < 0.05) %>% # get diff genes by ashr genotype 
+  dplyr::select(gene_name, entrezid,sign_paste_genotype_sh,starts_with("log2FoldChange")) %>% # selecting relevant columns
+  dplyr::select(!contains("lrt")) %>% # REmove lrt columns
+  dplyr::select(!contains("housing")) %>% # remove housing pairwise comparison 
+  dplyr::select(!contains("_GH_")) # remove GH columns 
+
+# Filter by absolute Fold change
+# Create a matrix with only fold change 
+pairwise_log2fc_genotype_mat <- pairwise_log2fc_genotype_df_ashr_SH %>%
+  dplyr::select(starts_with("log2FoldChange"))
+# Make a logical filterl
+logfc_genotype_filter <- rowSums(abs(pairwise_log2fc_genotype_mat) > 0.1) >= 1
+
+# Filter out the dataframe
+pairwise_log2fc_genotype_df_ashr_SH <- pairwise_log2fc_genotype_df_ashr_SH %>%
+  dplyr::filter(logfc_genotype_filter)
+
+# Change the column names for the data.frame to keep only relevant info 
+colnames(pairwise_log2fc_genotype_df_ashr_SH) <- str_remove(colnames(pairwise_log2fc_genotype_df_ashr_SH), "log2FoldChange_")
+colnames(pairwise_log2fc_genotype_df_ashr_SH) <- str_remove(colnames(pairwise_log2fc_genotype_df_ashr_SH), "_SH_genotype")
+
+# Change log2fc columns to a single log2c column for compatibility with ggplot2
+pairwise_log2fc_genotype_df_ashr_SH <- pairwise_log2fc_genotype_df_ashr_SH %>%
+  pivot_longer(cols = - c(gene_name,entrezid,sign_paste_genotype_sh), names_to = "genotype",values_to = "log2FoldChange")
+
+
+
 
 
 ##########
@@ -462,6 +585,11 @@ saveRDS(log2fc_mat_housing,file = "data_output/2024-1_diffexpr_output/log2fc_mat
 saveRDS(log2fc_mat_genotype_gh,file = "data_output/2024-1_diffexpr_output/log2fc_mat_genotype_gh.Rds")
 saveRDS(log2fc_mat_genotype_sh,file = "data_output/2024-1_diffexpr_output/log2fc_mat_genotype_sh.Rds")
 
+# Pairwise data for ashr diff genes
+saveRDS(pairwise_log2fc_genotype_df_ashr_GH,file = "data_output/2024-1_diffexpr_output/pairwise_log2fc_genotype_df_ashr_GH.Rds")
+saveRDS(pairwise_log2fc_genotype_df_ashr_SH,file = "data_output/2024-1_diffexpr_output/pairwise_log2fc_genotype_df_ashr_SH.Rds")
+
+
 # Pairwise data for lrt diff genes
 saveRDS(pairwise_log2fc_interaction_df,file = "data_output/2024-1_diffexpr_output/pairwise_log2fc_interaction_df.Rds")
 saveRDS(pairwise_log2fc_housing_df,file = "data_output/2024-1_diffexpr_output/pairwise_log2fc_housing_df.Rds")
@@ -469,5 +597,15 @@ saveRDS(pairwise_log2fc_genotype_df,file = "data_output/2024-1_diffexpr_output/p
 
 # DE genes list
 saveRDS(de,file = "data_output/2024-1_diffexpr_output/de.Rds")
+
+
+
+
+
+
+
+
+
+
 
 

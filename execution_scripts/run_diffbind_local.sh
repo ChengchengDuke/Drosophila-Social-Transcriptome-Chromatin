@@ -58,5 +58,5 @@ Rscript ./scripts/diffbind/diffbind_helper3_counts_to_vst.R
 Rscript ./scripts/diffbind/diffbind_helper4_data_wrangling.R
 
 # Go term enrichment 
-Rscript ./scripts/diffbind/diffbind_step3_go_terms.R
+#Rscript ./scripts/diffbind/diffbind_step3_go_terms.R
 

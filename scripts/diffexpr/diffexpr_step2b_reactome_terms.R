@@ -50,7 +50,7 @@ go_genotype$sh_up_entrezid <- compareCluster(geneClusters = comp_list$genotype_s
                                              organism = "fly",
                                              fun = enrichPathway, qvalueCutoff = 0.05, readable = TRUE)
 
-go_genotype$sh_down_entrezid <- compareCluster(geneClusters = comp_list$genotype_gh_down_entrezid,
+go_genotype$sh_down_entrezid <- compareCluster(geneClusters = comp_list$genotype_sh_down_entrezid,
                                                organism = "fly",
                                                fun = enrichPathway, qvalueCutoff = 0.05, readable = TRUE)
 

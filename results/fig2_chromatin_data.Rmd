@@ -297,7 +297,7 @@ res_long_h3k4me3_df %>%
   filter(!str_detect(comparison,"lrt")) %>%
   mutate(comparison = str_remove(comparison,"_housing_ashr")) %>%
   mutate(comparison = str_remove(comparison,"H3K4me3_")) %>%
-  ggplot(aes(log2FoldChange, -10*log10(pvalue),color = padj < 0.01 )) +
+  ggplot(aes(log2FoldChange, -10*log10(pvalue),color = padj < 0.05 )) +
   geom_point(size = 0.5, alpha = 0.5) +
   facet_grid(cols = vars(comparison)) +
   theme_classic() +
@@ -311,7 +311,7 @@ res_long_rnapolii_df %>%
   filter(!str_detect(comparison,"lrt")) %>%
   mutate(comparison = str_remove(comparison,"_housing_ashr")) %>%
   mutate(comparison = str_remove(comparison,"RNAPolII_")) %>%
-  ggplot(aes(log2FoldChange, -10*log10(pvalue),color = padj < 0.01 )) +
+  ggplot(aes(log2FoldChange, -10*log10(pvalue),color = padj < 0.05 )) +
   geom_point(size = 0.5, alpha = 0.5) +
   facet_grid(cols = vars(comparison)) +
   theme_classic() +
@@ -331,7 +331,7 @@ res_long_h3k4me3_df %>%
   filter(!str_detect(comparison,"lrt")) %>%
     mutate(comparison = str_remove(comparison,"_genotype_ashr")) %>%
   mutate(comparison = str_remove(comparison,"H3K4me3_")) %>%
-  ggplot(aes(log2FoldChange, -10*log10(padj),color = padj < 0.01 )) +
+  ggplot(aes(log2FoldChange, -10*log10(padj),color = padj < 0.05 )) +
   geom_point(size = 0.5, alpha = 0.5) +
   facet_grid(cols = vars(comparison)) +
   ylim(c(0,100)) +
@@ -351,7 +351,7 @@ res_long_rnapolii_df %>%
   filter(!str_detect(comparison,"lrt")) %>%
     mutate(comparison = str_remove(comparison,"_genotype_ashr")) %>%
   mutate(comparison = str_remove(comparison,"RNAPolII_")) %>%
-  ggplot(aes(log2FoldChange, -10*log10(padj),color = padj < 0.01 )) +
+  ggplot(aes(log2FoldChange, -10*log10(padj),color = padj < 0.05 )) +
   geom_point(size = 0.5, alpha = 0.5) +
   facet_grid(cols = vars(comparison)) +
   ylim(c(0,100)) +
@@ -373,7 +373,7 @@ res_long_h3k4me3_df %>%
   filter(!str_detect(comparison,"lrt")) %>%
     mutate(comparison = str_remove(comparison,"_genotype_ashr")) %>%
   mutate(comparison = str_remove(comparison,"H3K4me3_")) %>%
-  ggplot(aes(log2FoldChange, -10*log10(padj),color = padj < 0.01 )) +
+  ggplot(aes(log2FoldChange, -10*log10(padj),color = padj < 0.05 )) +
   geom_point(size = 0.5, alpha = 0.5) +
   facet_grid(cols = vars(comparison)) +
   ylim(c(0,100)) +
@@ -393,7 +393,7 @@ res_long_rnapolii_df %>%
   filter(!str_detect(comparison,"lrt")) %>%
     mutate(comparison = str_remove(comparison,"_genotype_ashr")) %>%
   mutate(comparison = str_remove(comparison,"RNAPolII_")) %>%
-  ggplot(aes(log2FoldChange, -10*log10(padj),color = padj < 0.01 )) +
+  ggplot(aes(log2FoldChange, -10*log10(padj),color = padj < 0.05 )) +
   geom_point(size = 0.5, alpha = 0.5) +
   facet_grid(cols = vars(comparison)) +
   ylim(c(0,100)) +

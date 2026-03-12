@@ -30,4 +30,4 @@ Rscript ./scripts/diffexpr/diffexpr_helper3_counts_to_vst.R
 Rscript ./scripts/diffexpr/diffexpr_helper4_data_wrangling.R
 
 # Go term enrichment 
-Rscript ./scripts/diffexpr/diffexpr_step2_go_terms.R
+#Rscript ./scripts/diffexpr/diffexpr_step2_go_terms.R

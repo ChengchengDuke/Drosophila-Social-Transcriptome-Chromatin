@@ -21,10 +21,10 @@ deseq_obj@design <- ~ condition # design
 deseq_obj <- DESeq(deseq_obj) # Default is pairwise comparison 
 
 # Test
-## Creating a list that looks like this: # list(c("contrast" = "condition", "CS_SH" ,"CS_GH"), c("contrast" = "condition", "DSX_SH" ,"DSX_GH"), ...)
+## Creating a list that looks like this: # list(c("contrast" = "condition", "CS_GH" ,"CS_SH"), c("contrast" = "condition", "DSX_GH" ,"DSX_SH"), ...)
 contrast_list <- split(data.frame(contrast = "condition", 
-                                  level1 = paste0(levels(colData(deseq_obj)$genotype),"_","SH"),
-                                  level2 = paste0(levels(colData(deseq_obj)$genotype),"_","GH")), 1:length(levels(colData(deseq_obj)$genotype)))
+                                  level1 = paste0(levels(colData(deseq_obj)$genotype),"_","GH"),
+                                  level2 = paste0(levels(colData(deseq_obj)$genotype),"_","SH")), 1:length(levels(colData(deseq_obj)$genotype)))
 names(contrast_list) <- levels(colData(deseq_obj)$genotype)
 contrast_list <- lapply(contrast_list, unlist) # After splitting data frame to get the vector storing the contrast (re)
 

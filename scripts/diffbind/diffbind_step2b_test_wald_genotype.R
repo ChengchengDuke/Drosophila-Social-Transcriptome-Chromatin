@@ -88,7 +88,7 @@ names(res_ashr_gr_df_list) <- str_replace(names(res_ashr_list),".Rds",".tsv")
 iwalk(res_ashr_gr_df_list, ~ write_tsv(.x, .y))
 
 # Write deseq fitted objects
-saveRDS(object = deseq_obj, paste0(out_dir,res_names,"_deseq_obj_housing_fitted.Rds"))
+saveRDS(object = deseq_obj, paste0(out_dir,res_names,"_deseq_obj_genotype_fitted.Rds"))
 
 # DiffBind bedfiles
 names(res_up_list) <- str_replace(names(res_ashr_list),".Rds","_up.bed")

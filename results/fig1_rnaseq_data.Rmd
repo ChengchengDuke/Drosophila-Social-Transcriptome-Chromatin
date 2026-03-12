@@ -292,7 +292,7 @@ plotPCA(vsd_combat , intgroup = "condition") + ggtitle("PCA RNA-seq samples") +
 
 # Number of differentially expressed genes in pairwise comparisons 
 
-## Differentially expressed genes between housing conditions in each genotype (SH / GH)
+## Differentially expressed genes between housing conditions in each genotype (GH / SH)
 
 ```{r}
 res_long_df %>% 
@@ -313,7 +313,7 @@ res_long_df %>%
   theme_classic() +
   geom_text(aes(label = n_diff),nudge_x = 1, size = 3) + # Add number of genes to bars
   theme(aspect.ratio = 1) +
-  ggtitle("Number of differential genes between SH / GH") +
+  ggtitle("Number of differential genes between GH / SH") +
   xlab("Number of genes padj < 0.05 & abs(log2FoldChange) > 0.1")
 
 ```
@@ -339,7 +339,7 @@ res_long_df %>%
   theme_classic() +
   geom_text(aes(label = n_diff),nudge_x = 1, size = 5) + # Add number of genes to bars
   theme(aspect.ratio = 0.5) +
-  ggtitle("Number of differential genes between SH / GH") +
+  ggtitle("Number of differential genes between GH / SH") +
   xlab("Number of genes padj < 0.05 & abs(log2FoldChange) > 0.1")
 
 ```
@@ -378,10 +378,10 @@ res_long_df %>%
 
 ```{r}
 res_long_df %>% 
-  select(comparison, padj, log2FoldChange) %>%
-  filter(!str_detect(comparison,"lrt") & str_detect(comparison,"SH_genotype")) %>%
+  dplyr::select(comparison, padj, log2FoldChange) %>%
+  dplyr::filter(!str_detect(comparison,"lrt") & str_detect(comparison,"SH_genotype")) %>%
   drop_na(padj) %>%
-  filter(padj < 0.05 & abs(log2FoldChange) > 0.1)  %>%
+  dplyr::filter(padj < 0.05 & abs(log2FoldChange) > 0.1)  %>%
   mutate(log2fc_sign = ifelse(sign(log2FoldChange) > 0,"UP", "DOWN")) %>%
   group_by(comparison, log2fc_sign) %>%
   summarise(n_diff = dplyr::n()) %>%
@@ -413,7 +413,7 @@ ggVennDiagram::ggVennDiagram(comp_list$housing_all_symbol,
   ggtitle("Housing within genotype All")
 ```
 
-### Differential genes Up (fold change > 0.1, e.g. higher in SH, lower in GH)
+### Differential genes Up (fold change > 0.1, e.g. higher in GH, lower in SH)
 
 ```{r}
 ggVennDiagram::ggVennDiagram(comp_list$housing_up_symbol, label_alpha = 0, label = "count", label_color = "white", label_size = 5) +
@@ -421,7 +421,7 @@ ggVennDiagram::ggVennDiagram(comp_list$housing_up_symbol, label_alpha = 0, label
   ggtitle("Housing within genotype UP") 
 ```
 
-### Differential genes Down (fold change < -0.1, e.g. lower in SH, higher in GH)
+### Differential genes Down (fold change < -0.1, e.g. lower in GH, higher in SH)
 
 ```{r}
 ggVennDiagram::ggVennDiagram(comp_list$housing_down_symbol, label_alpha = 0, label = "count", label_color = "white", label_size = 5) +
@@ -534,7 +534,7 @@ print_go_table(reactome_housing$all_entrezid@compareClusterResult)
 ```
 
 
-### Differential genes Up (fold change > 0.1, e.g. higher in SH, lower in GH)
+### Differential genes Up (fold change > 0.1, e.g. higher in GH, lower in SH)
 
 dotplot
 
@@ -576,7 +576,7 @@ Full table of Reactome Results:
 print_go_table(reactome_housing$up_entrezid@compareClusterResult)
 ```
 
-### Differential genes Down (fold change < -0.1, e.g. higher in GH, lower in SH)
+### Differential genes Down (fold change < -0.1, e.g. lower in GH, higher in SH)
 
 dotplot
 
@@ -864,7 +864,7 @@ print_go_table(go_genotype$sh_down_entrezid@compareClusterResult)
 
 Every row represents a different gene. Color is mappet to DESEQ2 normalized counts scaled by the per row (i.e. per gene) standard deviation, and mean-subtracted (i.e. z score).
 
-##### All genes that are differentially expressed in SH CS / GH CS comparison 
+##### All genes that are differentially expressed in GH CS / SH CS comparison 
 
 Rows clustered 
 
@@ -912,13 +912,11 @@ plot_heatmap(norm_cts[de$cs_genes_id_dsx,],cluster_columns = TRUE, show_row_name
 
 ```
 
-##### go
-
 #### Z score median
 
 Same data as above, but the replicates were combined in a single column by taking the median of all 3 replicate values.
 
-##### All genes that are differentially expressed in SH CS / GH CS comparison 
+##### All genes that are differentially expressed in GH CS / SH CS comparison 
 
 rows clustered 
 
@@ -960,11 +958,10 @@ clustered rows and columns
 plot_heatmap(norm_cts_median[de$cs_genes_id_dsx,],cluster_columns = TRUE, show_row_names = TRUE, cluster_rows = TRUE)
 ```
 
-##### go
 
 #### log2FoldChange
 
-##### All genes that are differentially expressed in SH CS / GH CS comparison 
+##### All genes that are differentially expressed in GH CS / SH CS comparison 
 
 cluster rows 
 
@@ -1038,13 +1035,12 @@ plot_heatmap_log2fc(log2fc_mat_housing[rownames(log2fc_mat_housing) %in% de$cs_g
                     show_row_names = TRUE)
 ```
 
-##### go
 
 ### GH: each Mutant GH / CS GH
 
 #### Z score all reps
 
-##### All genes that are differentially expressed in SH CS / GH CS comparison 
+##### All genes that are differentially expressed in Mutant GH / CS GH comparison 
 
 cluster rows
 
@@ -1086,11 +1082,9 @@ cluster rows and columns
 plot_heatmap(norm_cts[de$genotype_gh_genes_id_dsx,], show_row_names = FALSE, cluster_rows = TRUE)
 ```
 
-##### go
-
 #### Z score median
 
-##### All genes that are differentially expressed in SH CS / GH CS comparison 
+##### All genes that are differentially expressed in Mutant GH / CS GH comparison 
 
 cluster rows 
 
@@ -1134,11 +1128,9 @@ plot_heatmap(norm_cts_median[de$genotype_gh_genes_id_dsx,], show_row_names = FAL
 ```
 
 
-##### go
-
 #### log2FoldChange
 
-##### All genes that are differentially expressed in SH CS / GH CS comparison 
+##### All genes that are differentially expressed in Mutant GH / CS GH comparison 
 
 cluster rows 
 
@@ -1207,7 +1199,6 @@ plot_heatmap_log2fc(log2fc_mat_genotype_gh[rownames(log2fc_mat_genotype_gh) %in%
                     show_row_names = FALSE)
 ```
 
-##### go
 
 ### SH: each Mutant SH / CS SH
 
@@ -1257,8 +1248,6 @@ cluster rows and columns
 plot_heatmap(norm_cts[de$genotype_sh_genes_id_dsx,], show_row_names = FALSE, cluster_rows = TRUE)
 ```
 
-##### go
-
 #### Z score median
 
 ##### All genes that are differentially expressed   
@@ -1302,8 +1291,6 @@ cluster rows and columns
 ```{r}
 plot_heatmap(norm_cts_median[de$genotype_sh_genes_id_dsx,], show_row_names = FALSE, cluster_rows = TRUE)
 ```
-
-##### go
 
 #### log2FoldChange
 
@@ -1377,8 +1364,6 @@ plot_heatmap_log2fc(log2fc_mat_genotype_sh[rownames(log2fc_mat_genotype_sh) %in%
 ```
 
 
-##### go
-
 # Volcano plots for different comparisons
 
 ## Housing within the same genotype
@@ -1396,7 +1381,7 @@ res_long_df %>%
   xlim(c(-5,5)) + # Cap log2foldchange
   theme_classic() +
   theme(aspect.ratio = 0.75, legend.position = "bottom") +
-  ggtitle("SH / GH within each genotype") + 
+  ggtitle("GH / SH within each genotype") + 
   scale_color_manual(values = c("FALSE" = "gray","TRUE" = "blue"))
   
 
@@ -1518,7 +1503,7 @@ We can ask three questions:
 
 - Genotype: For each gene, is there an effect of genotype? -> this will give us genes that are differentially expressed between genotypes. 
 - Housing: For each gene, is there an effect of housing? -> this will give us genes that are differentially expressed between housing. 
-- Genotype:Housing interaction: For each gene, is there a genotype-specific change in housing (for example, differentially expressed SH/GH only in CantonS but not in the rest.
+- Genotype:Housing interaction: For each gene, is there a genotype-specific change in housing (for example, differentially expressed GH/SH only in CantonS but not in the rest.
 
 ## Number of differentially expressed genes in each ANOVA-like LRT comparison
 
@@ -1582,8 +1567,8 @@ pairwise_log2fc_genotype_df_join <- left_join(pairwise_log2fc_genotype_df, pairw
 
 pairwise_log2fc_genotype_df_join %>%
   dplyr::filter(sign_paste_genotype_gh %in% pairwise_log2fc_genotype_top_sign_combinations) %>%
-  mutate(sign_paste_genotype_gh = fct_reorder(sign_paste_genotype_gh, desc(n_genes))) %>%
-  mutate(log2FoldChange = case_when(
+  dplyr::mutate(sign_paste_genotype_gh = fct_reorder(sign_paste_genotype_gh, dplyr::desc(n_genes))) %>%
+  dplyr::mutate(log2FoldChange = case_when(
     log2FoldChange > 1 ~ 1,
     log2FoldChange < -1 ~ -1,
     TRUE ~ log2FoldChange
@@ -1611,8 +1596,8 @@ pairwise_log2fc_housing_df_genes <- pairwise_log2fc_housing_df %>%
 
 sort(table(pairwise_log2fc_housing_df_genes$sign_paste)) %>%
   enframe() %>%
-  mutate(name = as.factor(name)) %>%
-  mutate(name = fct_reorder(name, sort(value))) %>%
+  dplyr::mutate(name = as.factor(name)) %>%
+  dplyr::mutate(name = fct_reorder(name, sort(value))) %>%
   ggplot(aes(value, name)) +
   geom_col() +
    theme_classic() +
@@ -1624,18 +1609,18 @@ sort(table(pairwise_log2fc_housing_df_genes$sign_paste)) %>%
 
 ```
 
-### Heatmap of LRT housing significant genes log2FoldChange of SH / GH within each genotye
+### Heatmap of LRT housing significant genes log2FoldChange of GH / SH within each genotye
 
 ```{r fig.width=6, fig.height=13}
 
 
 pairwise_log2fc_housing_df %>%
-  mutate(log2FoldChange = case_when(
+  dplyr::mutate(log2FoldChange = case_when(
     log2FoldChange > 1 ~ 1,
     log2FoldChange < -1 ~ -1,
     TRUE ~ log2FoldChange
   )) %>%
-  mutate(gene_name = fct_reorder(gene_name,log2FoldChange)) %>%
+  dplyr::mutate(gene_name = fct_reorder(gene_name,log2FoldChange)) %>%
   ggplot(aes(genotype, gene_name, fill = log2FoldChange)) +
   geom_tile() +  
   scale_fill_gradient2(mid = "white",high = "red",low = "blue") +
@@ -1658,8 +1643,8 @@ pairwise_log2fc_interaction_df_genes <- pairwise_log2fc_interaction_df %>%
 
 sort(table(pairwise_log2fc_interaction_df_genes$sign_paste)) %>%
   enframe() %>%
-  mutate(name = as.factor(name)) %>%
-  mutate(name = fct_reorder(name, sort(value))) %>%
+  dplyr::mutate(name = as.factor(name)) %>%
+  dplyr::mutate(name = fct_reorder(name, sort(value))) %>%
   ggplot(aes(value, name)) +
   geom_col() +
    theme_classic() +
@@ -1671,7 +1656,7 @@ sort(table(pairwise_log2fc_interaction_df_genes$sign_paste)) %>%
 
 ```
 
-### Heatmap of LRT interaction significant genes log2FoldChange of SH / GH within each genotye
+### Heatmap of LRT interaction significant genes log2FoldChange of GH / SH within each genotye
 
 ```{r }
 
@@ -1687,9 +1672,9 @@ pairwise_log2fc_interaction_top_sign_combinations <- pairwise_log2fc_interaction
 pairwise_log2fc_interaction_df_join <- left_join(pairwise_log2fc_interaction_df, pairwise_log2fc_interaction_df_ngenes, by = "sign_paste")
 
 pairwise_log2fc_interaction_df_join %>%
-  filter(sign_paste %in% pairwise_log2fc_interaction_top_sign_combinations) %>%
-  mutate(sign_paste = fct_reorder(sign_paste, desc(n_genes))) %>%
-  mutate(log2FoldChange = case_when(
+  dplyr::filter(sign_paste %in% pairwise_log2fc_interaction_top_sign_combinations) %>%
+  dplyr::mutate(sign_paste = fct_reorder(sign_paste, dplyr::desc(n_genes))) %>%
+  dplyr::mutate(log2FoldChange = case_when(
     log2FoldChange > 1 ~ 1,
     log2FoldChange < -1 ~ -1,
     TRUE ~ log2FoldChange
@@ -1716,7 +1701,7 @@ pairwise_log2fc_interaction_df_47bdiff <- pairwise_log2fc_interaction_df %>%
 "cs:-1_dsx:-1_fru:1_Or47b:1_Or67d:-1"  ))
 
 pairwise_log2fc_interaction_df_47bdiff %>%
-  mutate(log2FoldChange = case_when(
+  dplyr::mutate(log2FoldChange = case_when(
     log2FoldChange > 1 ~ 1,
     log2FoldChange < -1 ~ -1,
     TRUE ~ log2FoldChange
@@ -1736,7 +1721,7 @@ pairwise_log2fc_interaction_df_47bdiff %>%
 
 #### GO terms LRT Housing
 
-Genes that are differentially expressed SH/GH consistently across all genotype 
+Genes that are differentially expressed GH/SH consistently across all genotype 
 
 ```{r fig.height= 12}
 dotplot(go_lrt$housing,showCategory = 2, by='GeneRatio') +
@@ -1746,7 +1731,7 @@ dotplot(go_lrt$housing,showCategory = 2, by='GeneRatio') +
 
 #### GO terms LRT housing by genotype interaction
 
-Genes that show a genotype-specific response to the social environment (e.g.  differentially expressed SH/GH in one genotype but not others, or in multiple genotypes but not one, etc) 
+Genes that show a genotype-specific response to the social environment (e.g.  differentially expressed GH/SH in one genotype but not others, or in multiple genotypes but not one, etc) 
 
 ```{r fig.height=12}
 dotplot(go_lrt$interaction,showCategory = 2, by='GeneRatio') +

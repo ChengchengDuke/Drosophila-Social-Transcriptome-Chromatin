@@ -31,6 +31,34 @@ go_housing$down_entrezid <- compareCluster(geneClusters = comp_list$housing_down
                                            keyType = "ncbi-geneid",
                                            fun = enrichKEGG, qvalueCutoff = 0.05)
 
+#change format
+df_results <- go_housing$all_entrezid@compareClusterResult
+
+# Function to convert Entrez IDs to Gene Symbols while handling multiple IDs
+convert_entrez_to_symbol <- function(entrez_ids) {
+  genes <- unlist(strsplit(entrez_ids, "/"))  # Split multiple gene IDs
+  gene_symbols <- mapIds(
+    org.Dm.eg.db,
+    keys = genes,
+    column = "SYMBOL",
+    keytype = "ENTREZID",
+    multiVals = "first"  # Get first match if multiple exist
+  )
+  return(paste(na.omit(gene_symbols), collapse = "/"))  # Recombine into string
+}
+
+# Apply conversion function to each row
+df_results$geneSymbol <- sapply(df_results$geneID, convert_entrez_to_symbol)
+df_results$geneID <- df_results$geneSymbol
+df_results$Description <- gsub("- Drosophila melanogaster (fruit fly)", "", df_results$Description, fixed = TRUE)
+
+go_housing$all_entrezid@compareClusterResult <- df_results
+
+
+
+
+
+
 ## Genotype
 go_genotype <- list()
 
@@ -49,6 +77,32 @@ go_genotype$gh_down_entrezid <- compareCluster(geneClusters = comp_list$genotype
                                                keyType = "ncbi-geneid",
                                                fun = enrichKEGG, qvalueCutoff = 0.05)
 
+#change format
+df_results <- go_genotype$gh_all_entrezid@compareClusterResult
+
+# Function to convert Entrez IDs to Gene Symbols while handling multiple IDs
+convert_entrez_to_symbol <- function(entrez_ids) {
+  genes <- unlist(strsplit(entrez_ids, "/"))  # Split multiple gene IDs
+  gene_symbols <- mapIds(
+    org.Dm.eg.db,
+    keys = genes,
+    column = "SYMBOL",
+    keytype = "ENTREZID",
+    multiVals = "first"  # Get first match if multiple exist
+  )
+  return(paste(na.omit(gene_symbols), collapse = "/"))  # Recombine into string
+}
+
+# Apply conversion function to each row
+df_results$geneSymbol <- sapply(df_results$geneID, convert_entrez_to_symbol)
+df_results$geneID <- df_results$geneSymbol
+df_results$Description <- gsub("- Drosophila melanogaster (fruit fly)", "", df_results$Description, fixed = TRUE)
+
+go_genotype$gh_all_entrezid@compareClusterResult <- df_results
+
+
+
+
 go_genotype$sh_all_entrezid <- compareCluster(geneClusters = comp_list$genotype_sh_all_entrezid,
                                               organism = "dme",
                                               keyType = "ncbi-geneid",
@@ -59,10 +113,35 @@ go_genotype$sh_up_entrezid <- compareCluster(geneClusters = comp_list$genotype_s
                                              keyType = "ncbi-geneid",
                                              fun = enrichKEGG, qvalueCutoff = 0.05)
 
-go_genotype$sh_down_entrezid <- compareCluster(geneClusters = comp_list$genotype_gh_down_entrezid,
+go_genotype$sh_down_entrezid <- compareCluster(geneClusters = comp_list$genotype_sh_down_entrezid,
                                                organism = "dme",
                                                keyType = "ncbi-geneid",
                                                fun = enrichKEGG, qvalueCutoff = 0.05)
+
+#change format
+df_results <- go_genotype$sh_all_entrezid@compareClusterResult
+
+# Function to convert Entrez IDs to Gene Symbols while handling multiple IDs
+convert_entrez_to_symbol <- function(entrez_ids) {
+  genes <- unlist(strsplit(entrez_ids, "/"))  # Split multiple gene IDs
+  gene_symbols <- mapIds(
+    org.Dm.eg.db,
+    keys = genes,
+    column = "SYMBOL",
+    keytype = "ENTREZID",
+    multiVals = "first"  # Get first match if multiple exist
+  )
+  return(paste(na.omit(gene_symbols), collapse = "/"))  # Recombine into string
+}
+
+# Apply conversion function to each row
+df_results$geneSymbol <- sapply(df_results$geneID, convert_entrez_to_symbol)
+df_results$geneID <- df_results$geneSymbol
+df_results$Description <- gsub("- Drosophila melanogaster (fruit fly)", "", df_results$Description, fixed = TRUE)
+
+go_genotype$sh_all_entrezid@compareClusterResult <- df_results
+
+
 
 ## Interaction
 

@@ -41,8 +41,8 @@ deseq_obj <- DESeq(deseq_obj)
 # Test
 
 contrast_list <- split(data.frame(contrast = "condition",
-level1 = paste0(levels(colData(deseq_obj)$genotype),"_","SH"),
-level2 = paste0(levels(colData(deseq_obj)$genotype),"_","GH")), 1:length(levels(colData(deseq_obj)$genotype)))
+level1 = paste0(levels(colData(deseq_obj)$genotype),"_","GH"),
+level2 = paste0(levels(colData(deseq_obj)$genotype),"_","SH")), 1:length(levels(colData(deseq_obj)$genotype)))
 
 names(contrast_list) <- levels(colData(deseq_obj)$genotype)
 contrast_list <- lapply(contrast_list, unlist)

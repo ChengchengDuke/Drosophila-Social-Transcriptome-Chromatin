@@ -9,6 +9,7 @@ library(TxDb.Dmelanogaster.UCSC.dm6.ensGene)
 library(org.Dm.eg.db)
 library(GenomicFeatures)
 library(clusterProfiler)
+library(SummarizedExperiment)
 
 ######
 ### Functions
@@ -261,14 +262,67 @@ saveRDS(log2fc_mat_h3k4me3_genotype_sh, "data_output/2024-01_diffbind_cutnrun/lo
 saveRDS(log2fc_mat_rnapolii_genotype_gh, "data_output/2024-01_diffbind_cutnrun/log2fc_mat_rnapolii_genotype_gh.Rds")
 saveRDS(log2fc_mat_rnapolii_genotype_sh, "data_output/2024-01_diffbind_cutnrun/log2fc_mat_rnapolii_genotype_sh.Rds")
 
+
+
+
 ######
 # Connect to genes
 ######
+
 
 # Make Granges objects for both peaks objects, dataframe need seqnames, start, end
 res_gr_h3k4me3 <- makeGRangesFromDataFrame( res_df_h3k4me3,keep.extra.columns = TRUE)
 res_gr_rnapolii <- makeGRangesFromDataFrame( res_df_rnapolii,keep.extra.columns = TRUE)
 
+saveRDS(res_gr_h3k4me3, "data_output/2024-01_diffbind_cutnrun/res_gr_h3k4me3.Rds")
+saveRDS(res_gr_rnapolii, "data_output/2024-01_diffbind_cutnrun/res_gr_rnapolii.Rds")
+
+#h3k4me3
+#all peaks
+
+# Changing the names of chromosomes
+res_gr_h3k4me3_all_uscs <- res_gr_h3k4me3 
+seqlevels(res_gr_h3k4me3_all_uscs) <- paste0("chr",seqlevels(res_gr_h3k4me3_all_uscs)) # Add "chr" to chromosome names
+
+# Function to annotate peaks
+res_gr_h3k4me3_all_uscs_anno <- ChIPseeker::annotatePeak(unique(granges(res_gr_h3k4me3_all_uscs)), # peaks object 
+                                                         TxDb =TxDb.Dmelanogaster.UCSC.dm6.ensGene, 
+                                                         annoDb="org.Dm.eg.db") # annotation object
+
+peaks_genes_all_h3k4me3 <- as.data.frame(res_gr_h3k4me3_all_uscs_anno@anno) 
+peaks_genes_all_h3k4me3$seqnames <- gsub("chr", "", peaks_genes_all_h3k4me3$seqnames)
+res_gr_h3k4me3_genes <- left_join(peaks_genes_all_h3k4me3, res_df_h3k4me3, by = c("seqnames", "start", "end"))
+res_gr_h3k4me3_genes <- res_gr_h3k4me3_genes %>%
+  mutate(range_id = paste0(seqnames,":",start,"-",end))
+
+saveRDS(res_gr_h3k4me3_all_uscs_anno, "data_output/2024-01_diffbind_cutnrun/res_gr_h3k4me3_all_uscs_anno.Rds")
+saveRDS(res_gr_h3k4me3_genes, "data_output/2024-01_diffbind_cutnrun/res_gr_h3k4me3_genes.Rds")
+
+
+#rnapolii
+#all peaks
+
+# Changing the names of chromosomes
+res_gr_rnapolii_all_uscs <- res_gr_rnapolii 
+seqlevels(res_gr_rnapolii_all_uscs) <- paste0("chr",seqlevels(res_gr_rnapolii_all_uscs)) # Add "chr" to chromosome names
+
+# Function to annotate peaks
+res_gr_rnapolii_all_uscs_anno <- ChIPseeker::annotatePeak(unique(granges(res_gr_rnapolii_all_uscs)), # peaks object 
+                                                         TxDb =TxDb.Dmelanogaster.UCSC.dm6.ensGene, 
+                                                         annoDb="org.Dm.eg.db") # annotation object
+
+peaks_genes_all_rnapolii <- as.data.frame(res_gr_rnapolii_all_uscs_anno@anno) 
+peaks_genes_all_rnapolii$seqnames <- gsub("chr", "", peaks_genes_all_rnapolii$seqnames)
+res_gr_rnapolii_genes <- left_join(peaks_genes_all_rnapolii, res_df_rnapolii, by = c("seqnames", "start", "end"))
+res_gr_rnapolii_genes <- res_gr_rnapolii_genes %>%
+  mutate(range_id = paste0(seqnames,":",start,"-",end))
+
+saveRDS(res_gr_rnapolii_all_uscs_anno, "data_output/2024-01_diffbind_cutnrun/res_gr_rnapolii_all_uscs_anno.Rds")
+saveRDS(res_gr_rnapolii_genes, "data_output/2024-01_diffbind_cutnrun/res_gr_rnapolii_genes.Rds")
+
+
+
+#promoters_only
 # Get promoters info in a GRanges object
 # promoter function 
 promoters_dm6 <- promoters(TxDb.Dmelanogaster.UCSC.dm6.ensGene, columns = "gene_id",upstream=0,downstream=1)
@@ -287,31 +341,33 @@ names(promoter_map_entrez) <-  promoter_map_df_entrez$ENSEMBL
 promoters_dm6$entrez_id <- promoter_map_entrez[unlist(promoters_dm6$gene_id)]
 
 # Join H3K4me3 peaks and promoters data by the nearest TSS (keep distance info)
-res_gr_h3k4me3_genes <- plyranges::join_nearest_left(x = res_gr_h3k4me3,y = promoters_dm6, distance = TRUE) 
+res_gr_h3k4me3_genes_promoters_only <- plyranges::join_nearest_left(x = res_gr_h3k4me3,y = promoters_dm6, distance = TRUE) 
 
 # Making an id column for each peak merging their genome coordinate info 
-res_gr_h3k4me3_genes$range_id <- as.data.frame(granges(res_gr_h3k4me3_genes)) %>%
+res_gr_h3k4me3_genes_promoters_only$range_id <- as.data.frame(granges(res_gr_h3k4me3_genes_promoters_only)) %>%
   mutate(range_id = paste0(seqnames,":",start,"-",end)) %>%
   pull(range_id)
 
-names(res_gr_h3k4me3_genes) <- as.data.frame(elementMetadata(res_gr_h3k4me3_genes)) %>%
+names(res_gr_h3k4me3_genes_promoters_only) <- as.data.frame(elementMetadata(res_gr_h3k4me3_genes_promoters_only)) %>%
   pull(range_id)
 
 # Join RNAPolII peaks and promoters data by the nearest (keep distance info)
-res_gr_rnapolii_genes <- plyranges::join_nearest_left(x = res_gr_rnapolii,y = promoters_dm6, distance = TRUE)
-res_gr_rnapolii_genes$range_id <- as.data.frame(granges(res_gr_rnapolii_genes)) %>%
+res_gr_rnapolii_genes_promoters_only <- plyranges::join_nearest_left(x = res_gr_rnapolii,y = promoters_dm6, distance = TRUE)
+res_gr_rnapolii_genes_promoters_only$range_id <- as.data.frame(granges(res_gr_rnapolii_genes_promoters_only)) %>%
   mutate(range_id = paste0(seqnames,":",start,"-",end)) %>%
   pull(range_id)
 
-names(res_gr_rnapolii_genes) <- as.data.frame(elementMetadata(res_gr_rnapolii_genes)) %>%
+names(res_gr_rnapolii_genes_promoters_only) <- as.data.frame(elementMetadata(res_gr_rnapolii_genes_promoters_only)) %>%
   pull(range_id)
 
-saveRDS(res_gr_h3k4me3_genes, "data_output/2024-01_diffbind_cutnrun/res_gr_h3k4me3_genes.Rds")
-saveRDS(res_gr_rnapolii_genes, "data_output/2024-01_diffbind_cutnrun/res_gr_rnapolii_genes.Rds")
+saveRDS(res_gr_h3k4me3_genes_promoters_only, "data_output/2024-01_diffbind_cutnrun/res_gr_h3k4me3_genes_promoters_only.Rds")
+saveRDS(res_gr_rnapolii_genes_promoters_only, "data_output/2024-01_diffbind_cutnrun/res_gr_rnapolii_genes_promoters_only.Rds")
+
+
 
 # Get differential peaks ranges
 diff_ranges <- list()
-diff_ranges$h3k4me3_gh <- as.data.frame(elementMetadata(res_gr_h3k4me3_genes)) %>%
+diff_ranges$h3k4me3_gh <- as.data.frame(res_gr_h3k4me3_genes) %>%
   filter(padj_H3K4me3_dsxmut_GH_genotype_ashr < 0.01 | 
            padj_H3K4me3_frumut_GH_genotype_ashr < 0.01 |
            padj_H3K4me3_Or67dmut_GH_genotype_ashr < 0.01 |
@@ -319,7 +375,7 @@ diff_ranges$h3k4me3_gh <- as.data.frame(elementMetadata(res_gr_h3k4me3_genes)) %
   pull(range_id)
 
 
-diff_ranges$h3k4me3_sh <- as.data.frame(elementMetadata(res_gr_h3k4me3_genes)) %>%
+diff_ranges$h3k4me3_sh <- as.data.frame(res_gr_h3k4me3_genes) %>%
   filter(padj_H3K4me3_dsxmut_SH_genotype_ashr < 0.01 | 
            padj_H3K4me3_frumut_SH_genotype_ashr < 0.01 |
            padj_H3K4me3_Or67dmut_SH_genotype_ashr < 0.01 |
@@ -327,7 +383,7 @@ diff_ranges$h3k4me3_sh <- as.data.frame(elementMetadata(res_gr_h3k4me3_genes)) %
   pull(range_id)
 
 
-diff_ranges$rnapolii_gh <- as.data.frame(elementMetadata(res_gr_rnapolii_genes)) %>%
+diff_ranges$rnapolii_gh <- as.data.frame(res_gr_rnapolii_genes) %>%
   filter(padj_RNAPolII_dsxmut_GH_genotype_ashr < 0.01 | 
            padj_RNAPolII_frumut_GH_genotype_ashr < 0.01 |
            padj_RNAPolII_Or67dmut_GH_genotype_ashr < 0.01 |
@@ -335,109 +391,67 @@ diff_ranges$rnapolii_gh <- as.data.frame(elementMetadata(res_gr_rnapolii_genes))
   pull(range_id)
 
 
-diff_ranges$rnapolii_sh <- as.data.frame(elementMetadata(res_gr_rnapolii_genes)) %>%
+diff_ranges$rnapolii_sh <- as.data.frame(res_gr_rnapolii_genes) %>%
   filter(padj_RNAPolII_dsxmut_SH_genotype_ashr < 0.01 | 
            padj_RNAPolII_frumut_SH_genotype_ashr < 0.01 |
            padj_RNAPolII_Or67dmut_SH_genotype_ashr < 0.01 |
            padj_RNAPolII_Or47bmut_SH_genotype_ashr < 0.01) %>%
   pull(range_id)
 
-diff_ranges$h3k4me3_gh_genes <- as.data.frame(elementMetadata(res_gr_h3k4me3_genes)) %>%
+diff_ranges$h3k4me3_gh_genes <- as.data.frame(res_gr_h3k4me3_genes) %>%
   filter(padj_H3K4me3_dsxmut_GH_genotype_ashr < 0.01 | 
            padj_H3K4me3_frumut_GH_genotype_ashr < 0.01 |
            padj_H3K4me3_Or67dmut_GH_genotype_ashr < 0.01 |
            padj_H3K4me3_Or47bmut_GH_genotype_ashr < 0.01) %>%
-  pull(gene_name) %>%
+  pull(SYMBOL) %>%
   unique() %>%
   na.omit()
 
 
-diff_ranges$h3k4me3_sh_genes <- as.data.frame(elementMetadata(res_gr_h3k4me3_genes)) %>%
+diff_ranges$h3k4me3_sh_genes <- as.data.frame(res_gr_h3k4me3_genes) %>%
   filter(padj_H3K4me3_dsxmut_SH_genotype_ashr < 0.01 | 
            padj_H3K4me3_frumut_SH_genotype_ashr < 0.01 |
            padj_H3K4me3_Or67dmut_SH_genotype_ashr < 0.01 |
            padj_H3K4me3_Or47bmut_SH_genotype_ashr < 0.01) %>%
-  pull(gene_name)%>%
+  pull(SYMBOL)%>%
   unique() %>%
   na.omit()
 
 
-diff_ranges$rnapolii_gh_genes <- as.data.frame(elementMetadata(res_gr_rnapolii_genes)) %>%
+diff_ranges$rnapolii_gh_genes <- as.data.frame(res_gr_rnapolii_genes) %>%
   filter(padj_RNAPolII_dsxmut_GH_genotype_ashr < 0.01 | 
            padj_RNAPolII_frumut_GH_genotype_ashr < 0.01 |
            padj_RNAPolII_Or67dmut_GH_genotype_ashr < 0.01 |
            padj_RNAPolII_Or47bmut_GH_genotype_ashr < 0.01) %>%
-  pull(gene_name)%>%
+  pull(SYMBOL)%>%
   unique() %>%
   na.omit()
 
 
-diff_ranges$rnapolii_sh_genes <- as.data.frame(elementMetadata(res_gr_rnapolii_genes)) %>%
+diff_ranges$rnapolii_sh_genes <- as.data.frame(res_gr_rnapolii_genes) %>%
   filter(padj_RNAPolII_dsxmut_SH_genotype_ashr < 0.01 | 
            padj_RNAPolII_frumut_SH_genotype_ashr < 0.01 |
            padj_RNAPolII_Or67dmut_SH_genotype_ashr < 0.01 |
            padj_RNAPolII_Or47bmut_SH_genotype_ashr < 0.01) %>%
-  pull(gene_name)%>%
+  pull(SYMBOL)%>%
   unique() %>%
   na.omit()
 
 saveRDS(diff_ranges, "data_output/2024-01_diffbind_cutnrun/diff_ranges.Rds")
 
 
-### Read target genes
-
-#### Fru
-
-fru_ma_genes <- read_csv("data_input/gene_annotations/fru_targets/Sheet 1-fruma_targets.csv")[,-2]
-fru_mc_genes <- read_csv("data_input/gene_annotations/fru_targets/Sheet 2-frumc_targets.csv")[,-2]
-fru_mb_genes <- read_csv("data_input/gene_annotations/fru_targets/Sheet 3-frumb_targets.csv")[,-2]
-
-
-fru_ma_genes <- fru_ma_genes$FruMA
-fru_mc_genes <- fru_mc_genes$FruMC
-fru_mb_genes <- fru_mb_genes$FruMB
-
-fru_target_genes <- unique(c(fru_ma_genes, fru_mc_genes, fru_mb_genes))
-
-de_genotype$h3k4me3_gh_genes_id_fru <- res_gr_h3k4me3_genes[diff_ranges$h3k4me3_gh]$range_id[res_gr_h3k4me3_genes[diff_ranges$h3k4me3_gh]$gene_name %in% fru_target_genes]
-
-de_genotype$h3k4me3_sh_genes_id_fru <- res_gr_h3k4me3_genes[diff_ranges$h3k4me3_sh]$range_id[res_gr_h3k4me3_genes[diff_ranges$h3k4me3_sh]$gene_name %in% fru_target_genes]
-
-
-de_genotype$rnapolii_gh_genes_id_fru <- res_gr_rnapolii_genes[diff_ranges$rnapolii_gh]$range_id[res_gr_rnapolii_genes[diff_ranges$rnapolii_gh]$gene_name %in% fru_target_genes]
-
-de_genotype$rnapolii_sh_genes_id_fru <- res_gr_rnapolii_genes[diff_ranges$rnapolii_sh]$range_id[res_gr_rnapolii_genes[diff_ranges$rnapolii_sh]$gene_name %in% fru_target_genes]
-
-
-#### dsx
-dsx_target_genes <- readxl::read_excel("data_input/gene_annotations/dsx_target_genes.xlsx",sheet = 3)
-dsx_target_genes <- dsx_target_genes$`Male_Fatbody_DamIDseq_Gene_Level_Occupancy> 0.9`
-
-
-de_genotype_h3k4me3_gh_genes_id_dsx <- res_gr_h3k4me3_genes[diff_ranges$h3k4me3_gh]$range_id[res_gr_h3k4me3_genes[diff_ranges$h3k4me3_gh]$gene_name %in% dsx_target_genes]
-
-de_genotype_h3k4me3_sh_genes_id_dsx <- res_gr_h3k4me3_genes[diff_ranges$h3k4me3_sh]$range_id[res_gr_h3k4me3_genes[diff_ranges$h3k4me3_sh]$gene_name %in% dsx_target_genes]
-
-
-de_genotype_rnapolii_gh_genes_id_dsx <- res_gr_rnapolii_genes[diff_ranges$rnapolii_gh]$range_id[res_gr_rnapolii_genes[diff_ranges$rnapolii_gh]$gene_name %in% dsx_target_genes]
-
-de_genotype_rnapolii_sh_genes_id_dsx <- res_gr_rnapolii_genes[diff_ranges$rnapolii_sh]$range_id[res_gr_rnapolii_genes[diff_ranges$rnapolii_sh]$gene_name %in% dsx_target_genes]
-
-
 # Make gene name to range map 
-res_gr_h3k4me3_genes <- unique(res_gr_h3k4me3_genes)
-res_gr_rnapolii_genes <- unique(res_gr_rnapolii_genes)
+#res_gr_h3k4me3_genes <- unique(res_gr_h3k4me3_genes)
+#res_gr_rnapolii_genes <- unique(res_gr_rnapolii_genes)
 
-gene_map_h3k4me3 <- res_gr_h3k4me3_genes$gene_name
+gene_map_h3k4me3 <- res_gr_h3k4me3_genes$SYMBOL
 names(gene_map_h3k4me3) <- res_gr_h3k4me3_genes$range_id
 
-gene_map_rnapolii <- res_gr_rnapolii_genes$gene_name
+gene_map_rnapolii <- res_gr_rnapolii_genes$SYMBOL
 names(gene_map_rnapolii) <- res_gr_rnapolii_genes$range_id
 
 # Filter matrices and rename to have them gene-based instead of peak-based 
 norm_cts_h3k4me3_gene <- rownames_filt_and_convert_to_gene(norm_cts_h3k4me3,gene_map_h3k4me3)
-
-
 norm_cts_h3k4me3_median_gene <- rownames_filt_and_convert_to_gene(norm_cts_h3k4me3_median,gene_map_h3k4me3)
 norm_cts_rnapolii_gene <- rownames_filt_and_convert_to_gene(norm_cts_rnapolii,gene_map_rnapolii)
 norm_cts_rnapolii_median_gene <- rownames_filt_and_convert_to_gene(norm_cts_rnapolii_median,gene_map_rnapolii)
@@ -625,7 +639,7 @@ colnames(pairwise_log2fc_h3k4me3_df) <- str_remove(colnames(pairwise_log2fc_h3k4
 
 pairwise_log2fc_h3k4me3_df <- pairwise_log2fc_h3k4me3_df %>%
   pivot_longer(cols = - c(seqnames, start, end,sign_paste_genotype_gh), names_to = "genotype",values_to = "log2FoldChange") %>%
-  mutate(gene_name = paste0(seqnames,":",start,"-",end))
+  mutate(SYMBOL = paste0(seqnames,":",start,"-",end))
 
 
 # Filter results dataframe to get significant lrt genotype regions
@@ -658,7 +672,7 @@ colnames(pairwise_log2fc_rnapolii_df) <- str_remove(colnames(pairwise_log2fc_rna
 
 pairwise_log2fc_rnapolii_df <- pairwise_log2fc_rnapolii_df %>%
   pivot_longer(cols = - c(seqnames, start, end,sign_paste_genotype_gh), names_to = "genotype",values_to = "log2FoldChange") %>%
-  mutate(gene_name = paste0(seqnames,":",start,"-",end))
+  mutate(SYMBOL = paste0(seqnames,":",start,"-",end))
 
 # Save data
 saveRDS(pairwise_log2fc_h3k4me3_df, "data_output/2024-01_diffbind_cutnrun/pairwise_log2fc_h3k4me3_df.Rds")
