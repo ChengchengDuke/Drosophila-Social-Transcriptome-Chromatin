@@ -7,3 +7,4 @@ data_*/*
 .httr-oauth
 .DS_Store
 .quarto
+NOTE.md
